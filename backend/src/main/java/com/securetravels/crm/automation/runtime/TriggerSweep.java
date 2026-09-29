@@ -47,20 +47,27 @@ public class TriggerSweep {
     private final AutomationEventRecordRepository events;
     private final ObjectMapper mapper;
     private final JdbcTemplate jdbc;
+    private final com.securetravels.crm.common.config.AppProperties.Automation cfg;
 
     public TriggerSweep(WorkflowVersionRepository versions,
                         AutomationEventRecordRepository events,
                         ObjectMapper mapper,
-                        JdbcTemplate jdbc) {
+                        JdbcTemplate jdbc,
+                        com.securetravels.crm.common.config.AppProperties props) {
         this.versions = versions;
         this.events = events;
         this.mapper = mapper;
         this.jdbc = jdbc;
+        this.cfg = props.getAutomation();
     }
 
     @Scheduled(fixedDelayString = "${app.automation.trigger-poll-millis}",
             initialDelayString = "${app.automation.trigger-poll-millis}")
     public void runOnce() {
+        if (cfg.isKillSwitchEnabled()) {
+            log.warn("[automation] kill switch engaged; trigger sweep paused");
+            return;
+        }
         Instant now = Instant.now();
         List<WorkflowVersion> actives = versions.findByStatusOrderByCreatedAtAsc(WorkflowStatus.ACTIVE);
         for (WorkflowVersion version : actives) {

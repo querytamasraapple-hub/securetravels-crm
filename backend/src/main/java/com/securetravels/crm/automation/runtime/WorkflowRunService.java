@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -46,7 +47,6 @@ import java.util.UUID;
 public class WorkflowRunService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowRunService.class);
-    private static final int MAX_COORDINATE_ITERATIONS = 10_000;
 
     private final WorkflowRunRepository runs;
     private final WorkflowRunStepRepository steps;
@@ -59,6 +59,7 @@ public class WorkflowRunService {
     private final ObjectMapper mapper;
     private final UserRepository users;
     private final NotificationRepository notifications;
+    private final AutomationGuards guards;
     private final TransactionTemplate tx;
     private final TransactionTemplate txStep;
 
@@ -72,6 +73,7 @@ public class WorkflowRunService {
                               ObjectMapper mapper,
                               UserRepository users,
                               NotificationRepository notifications,
+                              AutomationGuards guards,
                               PlatformTransactionManager tm) {
         this.runs = runs;
         this.steps = steps;
@@ -84,6 +86,7 @@ public class WorkflowRunService {
         this.mapper = mapper;
         this.users = users;
         this.notifications = notifications;
+        this.guards = guards;
         this.tx = new TransactionTemplate(tm);
         this.txStep = new TransactionTemplate(tm);
         this.txStep.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -99,6 +102,10 @@ public class WorkflowRunService {
      */
     public UUID startRun(WorkflowVersion version, String entity, String action,
                          UUID subjectId, Instant occurredAt, String eventKey) {
+        if (guards.killSwitch()) {
+            log.warn("[automation] kill switch engaged; declining {} {} for subject {}", entity, action, subjectId);
+            return null;
+        }
         WorkflowDefinition def = parse(version.getDefinition());
         if (def.steps().isEmpty()) {
             return null;
@@ -117,6 +124,22 @@ public class WorkflowRunService {
         UUID runId;
         try {
             runId = tx.execute(status -> {
+                com.securetravels.crm.common.config.AppProperties.Automation cfg = guards.cfg();
+                if (cfg.getRateLimitPerWorkflowPerMinute() > 0
+                        && runs.countByWorkflowIdAndCreatedAtAfter(version.getWorkflowId(),
+                        Instant.now().minusSeconds(60)) >= cfg.getRateLimitPerWorkflowPerMinute()) {
+                    log.warn("[automation] rate limit {} runs/min reached for workflow {}; declining {}",
+                            cfg.getRateLimitPerWorkflowPerMinute(), version.getWorkflowId(), eventKey);
+                    return null;
+                }
+                if (cfg.getMaxActiveRunsPerWorkflow() > 0
+                        && runs.countByWorkflowIdAndStatusIn(version.getWorkflowId(), Set.of(
+                        WorkflowRunStatus.RUNNING, WorkflowRunStatus.WAITING))
+                        >= cfg.getMaxActiveRunsPerWorkflow()) {
+                    log.warn("[automation] active-run quota {} reached for workflow {}; declining {}",
+                            cfg.getMaxActiveRunsPerWorkflow(), version.getWorkflowId(), eventKey);
+                    return null;
+                }
                 WorkflowRun run = runs.saveAndFlush(new WorkflowRun(
                         version.getWorkflowId(), version.getId(), entity,
                         subjectId, eventKey, eventKey));
@@ -137,6 +160,10 @@ public class WorkflowRunService {
             return null;
         }
 
+        if (runId == null) {
+            return null;
+        }
+
         log.info("[automation] run {} started for {} {} ({})", runId, entity, subjectId, eventKey);
         String first = def.steps().stream().min(Comparator.comparingInt(StepDefinition::order))
                 .map(StepDefinition::id).orElse(null);
@@ -153,7 +180,8 @@ public class WorkflowRunService {
     public void coordinate(UUID runId, String fromStepId) {
         String current = fromStepId;
         int guard = 0;
-        while (current != null && guard <= MAX_COORDINATE_ITERATIONS) {
+        int cap = guards.depthCap();
+        while (current != null && guard <= cap) {
             WorkflowRun run = runs.findById(runId).orElse(null);
             if (run == null || !run.alive()) {
                 return;
@@ -162,7 +190,8 @@ public class WorkflowRunService {
             guard++;
         }
         if (current != null) {
-            log.warn("[automation] run {} exceeded the coordination budget (last step {})", runId, current);
+            log.warn("[automation] run {} exceeded the coordination budget of {} steps (last step {})",
+                    runId, cap, current);
         }
     }
 
@@ -181,6 +210,10 @@ public class WorkflowRunService {
     private String executeStepInternal(UUID runId, String stepId) {
         WorkflowRun run = runs.findById(runId).orElse(null);
         if (run == null || !run.alive()) {
+            return null;
+        }
+        if (guards.killSwitch()) {
+            log.warn("[automation] kill switch engaged; freezing run {} at {}", runId, stepId);
             return null;
         }
 
@@ -291,6 +324,16 @@ public class WorkflowRunService {
                 return null;
             }
             default -> {
+                if (guards.dryRun()) {
+                    ledger.skipped("dry-run enabled: effect '" + step.action().name() + "' not applied");
+                    steps.save(ledger);
+                    String next = successor(def, step);
+                    run.position(next);
+                    runs.save(run);
+                    log.info("[automation] run {} step {} recorded, dry-run (no effect performed)",
+                            run.getId(), step.id());
+                    return next;
+                }
                 return effect(step, snapshot, run, ledger, def);
             }
         }

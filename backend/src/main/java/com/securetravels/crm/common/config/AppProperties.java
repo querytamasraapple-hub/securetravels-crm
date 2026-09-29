@@ -335,6 +335,11 @@ public class AppProperties {
         private int pollBatchSize = 20;
         private long recoveryGraceMillis = 60_000;
         private int eventMaxAttempts = 5;
+        private boolean killSwitchEnabled = false;
+        private boolean dryRunEnabled = false;
+        private int rateLimitPerWorkflowPerMinute = 0;
+        private int maxActiveRunsPerWorkflow = 0;
+        private int coordinateDepthCap = 10_000;
 
         public int getMaxStepsPerWorkflow() { return maxStepsPerWorkflow; }
         public void setMaxStepsPerWorkflow(int maxStepsPerWorkflow) { this.maxStepsPerWorkflow = maxStepsPerWorkflow; }
@@ -354,5 +359,19 @@ public class AppProperties {
         public void setRecoveryGraceMillis(long recoveryGraceMillis) { this.recoveryGraceMillis = recoveryGraceMillis; }
         public int getEventMaxAttempts() { return eventMaxAttempts; }
         public void setEventMaxAttempts(int eventMaxAttempts) { this.eventMaxAttempts = eventMaxAttempts; }
+        public boolean isKillSwitchEnabled() { return killSwitchEnabled; }
+        public void setKillSwitchEnabled(boolean killSwitchEnabled) { this.killSwitchEnabled = killSwitchEnabled; }
+        public boolean isDryRunEnabled() { return dryRunEnabled; }
+        public void setDryRunEnabled(boolean dryRunEnabled) { this.dryRunEnabled = dryRunEnabled; }
+        public int getRateLimitPerWorkflowPerMinute() { return rateLimitPerWorkflowPerMinute; }
+        public void setRateLimitPerWorkflowPerMinute(int rateLimitPerWorkflowPerMinute) {
+            this.rateLimitPerWorkflowPerMinute = rateLimitPerWorkflowPerMinute;
+        }
+        public int getMaxActiveRunsPerWorkflow() { return maxActiveRunsPerWorkflow; }
+        public void setMaxActiveRunsPerWorkflow(int maxActiveRunsPerWorkflow) {
+            this.maxActiveRunsPerWorkflow = maxActiveRunsPerWorkflow;
+        }
+        public int getCoordinateDepthCap() { return coordinateDepthCap; }
+        public void setCoordinateDepthCap(int coordinateDepthCap) { this.coordinateDepthCap = coordinateDepthCap; }
     }
 }

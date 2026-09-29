@@ -53,6 +53,10 @@ public class WorkflowStepPoller {
     @Scheduled(fixedDelayString = "${app.automation.step-poll-millis}",
                initialDelayString = "${app.automation.step-poll-millis}")
     public void drain() {
+        if (cfg.isKillSwitchEnabled()) {
+            log.warn("[automation] kill switch engaged; step poller paused");
+            return;
+        }
         List<WorkflowScheduledStep> due = tx.execute(s ->
                 jdbc.queryForList("""
                         SELECT id FROM workflow_scheduled_steps

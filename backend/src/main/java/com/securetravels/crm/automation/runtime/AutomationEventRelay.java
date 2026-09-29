@@ -69,6 +69,10 @@ public class AutomationEventRelay {
     @Scheduled(fixedDelayString = "${app.automation.relay-poll-millis}",
                initialDelayString = "${app.automation.relay-poll-millis}")
     public void drain() {
+        if (cfg.isKillSwitchEnabled()) {
+            log.warn("[automation] kill switch engaged; relay paused");
+            return;
+        }
         List<UUID> claimed = tx.execute(s ->
                 jdbc.queryForList("""
                         SELECT id FROM automation_events

@@ -108,6 +108,21 @@ app:
     poll-batch-size: ${AUTOMATION_POLL_BATCH_SIZE:20}
     recovery-grace-millis: ${AUTOMATION_RECOVERY_GRACE_MILLIS:60000}
     event-max-attempts: ${AUTOMATION_EVENT_MAX_ATTEMPTS:5}
+    # Phase 6 Module 3 — guardrails. All are live operator flips read on every
+    # tick, so an incident response is a config change without a redeploy.
+    # kill-switch-enabled halts every engine path (relay, poller, trigger and
+    # recovery sweeps, step execution, run creation) without touching existing
+    # runs; step-ledger + effect-guard idempotency resumes them exactly.
+    kill-switch-enabled: ${AUTOMATION_KILL_SWITCH_ENABLED:false}
+    # dry-run-enabled keeps the engine flowing (runs, conditions, verdicts) but
+    # records every effect step as SKIPPED instead of performing it.
+    dry-run-enabled: ${AUTOMATION_DRY_RUN_ENABLED:false}
+    # 0 = unlimited. Rate limit caps run creation per workflow per minute;
+    # max-active-runs-per-workflow caps concurrent live (RUNNING/WAITING) runs.
+    rate-limit-per-workflow-per-minute: ${AUTOMATION_RATE_LIMIT_PER_WORKFLOW_PER_MINUTE:0}
+    max-active-runs-per-workflow: ${AUTOMATION_MAX_ACTIVE_RUNS_PER_WORKFLOW:0}
+    # Hard stop on steps driven in a single coordinate pass (runaway BRANCH loop).
+    coordinate-depth-cap: ${AUTOMATION_COORDINATE_DEPTH_CAP:10000}
 
 management:
   endpoints:

@@ -43,6 +43,10 @@ public class RunRecoverySweep {
     @Scheduled(fixedDelayString = "${app.automation.recovery-interval-millis}",
                initialDelayString = "${app.automation.recovery-interval-millis}")
     public void runOnce() {
+        if (cfg.isKillSwitchEnabled()) {
+            log.warn("[automation] kill switch engaged; recovery sweep paused");
+            return;
+        }
         Instant staleAfter = Instant.now().minus(Duration.ofMillis(cfg.getRecoveryGraceMillis()));
         for (WorkflowRun run : runs.findAllByStatusIn(Set.of(
                 WorkflowRunStatus.RUNNING, WorkflowRunStatus.WAITING))) {

@@ -34,6 +34,13 @@ app:
     recovery-grace-millis: 3600000
     poll-batch-size: 20
     event-max-attempts: 5
+    # Module 3 guardrails: off by default; GuardrailsIT flips the live config
+    # bean per scenario and restores it after, so no static overrides here.
+    kill-switch-enabled: false
+    dry-run-enabled: false
+    rate-limit-per-workflow-per-minute: 0
+    max-active-runs-per-workflow: 0
+    coordinate-depth-cap: 10000
 logging:
   level:
     org.hibernate.SQL: OFF
