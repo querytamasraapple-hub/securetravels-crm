@@ -1,6 +1,6 @@
 # SecureTravels CRM — Phase 7 Step 0 Delta (Sales CRM Depth)
 
-> **Status: ratified 2026-10-01 (Step 0); Module 1 + Module 2 shipped 2026-10-01 (§7, §8).**
+> **Status: ratified 2026-10-01 (Step 0); Modules 1–3 shipped 2026-10-01 (§7, §8, §9).**
 > This file is the overlap audit and
 > build plan for Phase 7 — Accounts (B2B/corporate/travel-agent), configurable
 > pipeline stages, revenue forecasting, and commission calculation. It records
@@ -70,7 +70,7 @@ created because `accounts/` ships for real this phase.
 |---|---|---|
 | `V19__accounts_and_links.sql` | Module 1 | `accounts` (type CORPORATE/TRAVEL_AGENT, name, GSTIN, billing/contact fields, status, timestamps); nullable `account_id` FK on `leads` + `bookings`; travel-agent commission payable table (`booking_id` UNIQUE, account, amounts, status, settle fields); account-first `invoices` (INV-ref, ISSUED/VOID) |
 | `V20__pipeline_stages.sql` | Module 2 | `pipeline_stages` (key, label, sort order, probability weight, entry condition metadata) + seeded **default** stages qualified by the kickoff defaults (Qualified 20%, Quotation Sent 40%, Negotiation 70%) |
-| `V21__opportunities_forecast.sql` | Module 3 | `opportunities` (subject = lead/account, `stage_id`, expected value, expected date, ownership) + forecast materialisation/rollup columns |
+| `V21__opportunities_forecast.sql` | Module 3 | `opportunities` (subject = lead/account, `stage_id`, expected value, expected date, ownership, close fields). **Shipped without rollup columns** — forecast is live-computed (§9) |
 | `V22__commission_plans.sql` | Module 4 | `commission_plans`, `commission_tiers`, `account_commission_plans` |
 | `V23__sales_reporting.sql` | Module 5 | indexes/read-model support for pipeline + forecast + commission reports (aggregates only if measurement shows they're needed) |
 
@@ -238,7 +238,51 @@ Shipped in the same commit as this update: `V20__pipeline_stages.sql`, the
   0 failures, 11 skipped — Rabbit/Docker).
 - **BaseIT** — `pipeline_stages` is reference data (like `whatsapp_templates` /
   `channel_templates`): not truncated; instead the seeded set is restored
-  before each test (delete-all + re-insert the three defaults). When Module 3
-  adds opportunity FKs this must become a deactivate-only reset.
+  before each test (delete-all + re-insert the three defaults). The reset runs
+  **after** the table truncation list, so once Module 3 added the
+  `opportunities.stage_id` FK the ordering keeps it safe.
 
-Module 3 (opportunities + revenue forecast) is next.
+## 9. Module 3 — shipped 2026-10-01
+
+Shipped in the same commit as this update: `V21__opportunities_forecast.sql`, the
+`Opportunity` entity/repository/service/controller + DTOs (including
+`ForecastResponse`), and `OpportunityFlowIT`.
+
+- **Schema** — `opportunities`: `lead_id` **UNIQUE** FK (one opportunity per
+  lead), `account_id`/`owner_id` FKs, `stage_id` FK → `pipeline_stages`,
+  `expected_value numeric(12,2)` CHECK `>= 0`, `expected_date date`,
+  `status` OPEN/WON/LOST, `stage_moved_at`, `closed_at`/`closed_by`/`closing_note`,
+  plus `chk_opportunity_close_consistency` (OPEN ⇒ close fields NULL; terminal ⇒
+  both set). Indexes on `(owner_id, status)`, `stage_id`, `expected_date`, `lead_id`.
+- **Package** — `com.securetravels.crm.accounts` per §3.1; served at
+  `GET/POST /api/opportunities`, `GET /api/opportunities/{id}`,
+  `PATCH /api/opportunities/{id}/stage`, `POST /api/opportunities/{id}/close`,
+  and `GET /api/forecast?from&to` (both bounds required).
+- **RBAC** — create is SALES–CEO (OPS → 403); list/get/move/close are
+  ownership-scoped in the service (MANAGER–CEO may pass `ownerId`, SALES/OPS are
+  pinned to their own rows) exactly as `LeadService` does. The owner is
+  **snapshotted from `leads.owner_id`**, never accepted from the client.
+- **Guards** — one opportunity per lead → 409; opportunity on a LOST lead → 409;
+  a second close or any stage move on a terminal opportunity → 409; only *active*
+  stages are valid targets (unknown → 404, deactivated → 409); no active stage
+  → 409; `from >= to` → 400. Stage moves/outcomes audited as `statusChange`.
+- **Forecast** — computed **live** from the current stage weights over the
+  half-open `[from, to)` window: `expected = Σ(value × weight/100)` (HALF_UP,
+  scale 2), `best = Σ open`, `won = Σ WON`, grouped by stage and by month.
+  Deviation from §3.3, deliberate: **no materialisation/rollup columns**. The
+  kickoff's rationale (re-weighting a stage must immediately change every
+  forecast) is fully satisfied by live compute, and a rollup table would be a
+  second source of truth to rebuild and drift. Deferred to Module 5, to be added
+  only if measurement of volume/latency demands it.
+- **Repository note** — the scoped search is a native query with explicit
+  `CAST(:param AS …)` on every optional filter. A JPQL `(:param is null or …)`
+  form compiles fine but leaves Postgres unable to type-infer the null-check
+  placeholders (`could not determine data type of parameter $n` → 500); the cast
+  form is the established convention (`LeadRepository.search`).
+- **Tests** — `OpportunityFlowIT`: create/move/close + forecast math (20000 @ 40% =
+  8000, 50000 @ 70% = 35000), cross-owner 403s (list, get, move, close),
+  one-per-lead/LOST-lead/OPS-create → 409/403, terminal-stage + window
+  validation, stage and month bucketing (43000 expected / 70000 best / 8000 won).
+  Full suite green (498 tests, 0 failures, 11 skipped — Rabbit/Docker).
+
+Module 4 (commission plans) is next.

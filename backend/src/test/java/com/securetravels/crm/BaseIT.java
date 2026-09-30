@@ -47,7 +47,8 @@ consent_records, consent_suppressions,
                  workflows, workflow_versions,
                  automation_events, workflow_runs, workflow_run_steps,
                  workflow_scheduled_steps, workflow_step_effects, workflow_run_failures,
-                 accounts, account_commission_payables, invoices
+                 accounts, account_commission_payables, invoices,
+                 opportunities
                   RESTART IDENTITY CASCADE""");
         // NB: whatsapp_templates is deliberately NOT truncated. It is reference
         // data seeded by V12; emptying it would make every outbound-send test

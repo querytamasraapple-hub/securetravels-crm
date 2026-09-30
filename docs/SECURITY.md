@@ -192,6 +192,19 @@ Phase 7 Module 2 (pipeline stage configuration, same commit trail):
 | **Integrity guards** — duplicate key or duplicate active sort order → `409 CONFLICT`; deleting/deactivating the sole remaining active stage refused (409); immutable key after create | `PipelineStageService` |
 | **Audited** — stage create/update/delete recorded in `audit_log` as `PIPELINE_STAGE` | `AuditService` |
 
+Phase 7 Module 3 (opportunities + revenue forecast, same commit trail):
+
+| Control | Where |
+|---|---|
+| **Opportunity listing is ownership-scoped in the service** — MANAGER/ADMIN/CEO may pass `ownerId` (see all); SALES/OPS are pinned to their own rows regardless of the parameter, mirroring `LeadService` | `OpportunityService.list` |
+| **Create is SALES/MANAGER/ADMIN/CEO** — OPS → `403 FORBIDDEN` | `OpportunityService.requireCreateRole` |
+| **Owner is snapshotted, never client-supplied** — taken from `leads.owner_id`; a non-manager may only create for a lead they own, so ownership cannot be escalated by crafting a request | `OpportunityService.create` |
+| **Terminal states are absorbing** — a second close or a stage move on `WON`/`LOST` → `409 CONFLICT` (service) and impossible at the DB level via `chk_opportunity_close_consistency` | `OpportunityService`, `V21` |
+| **One opportunity per lead** — `lead_id` UNIQUE, duplicate create → `409`; an opportunity for a `LOST` lead → `409` | `OpportunityService.create`, `V21` |
+| **Stage resolution cannot pick a hidden stage** — only *active* stages are valid targets; unknown key → `404`, deactivated key → `409` | `OpportunityService.resolveStage` |
+| **Forecast leaks nothing across owners** — the forecast query is scoped exactly like the list; window must satisfy `from < to` else `400`, and the window is half-open `[from, to)` so buckets never double-count | `OpportunityService.forecast` |
+| **Audited** — create as `OPPORTUNITY`; stage moves and outcomes as `statusChange` on the `stage`/`status` field | `AuditService` |
+
 ## Operational notes
 
 - **Prod must override**: `JWT_SECRET`, `WEBHOOK_SECRET`, `DB_URL`/password, CORS, and

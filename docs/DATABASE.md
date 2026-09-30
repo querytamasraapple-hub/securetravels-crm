@@ -3,10 +3,11 @@
 > **Single source of truth: `backend/src/main/resources/db/migration/`** —
 > Flyway applies schema, `ddl-auto: validate` prevents drift. This document
 > is a living map and must be updated in the same change as any new
-> migration. Migrations shipped: **V1 → V20** (V1–V12 Phase 1–2; V12 = Module 4
+> migration. Migrations shipped: **V1 → V21** (V1–V12 Phase 1–2; V12 = Module 4
 > WhatsApp + timeline; **V13 = Phase 3 Module 2** reporting ledger + search;
 > V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts;
-> **V20 = Phase 7 Module 2** pipeline stages).
+> **V20 = Phase 7 Module 2** pipeline stages; **V21 = Phase 7 Module 3**
+> opportunities + revenue forecast).
 
 Conventions used throughout:
 
@@ -424,7 +425,10 @@ leads 1─0..1 customer360        leads 1─0..1 duplicate leads
 leads 1─0..* bookings.lead_id   leads 1─* tasks.lead_id
 leads 1─* audit_log.lead        leads 1─* webhook_logs.lead_id
 accounts 1─* leads.account_id   accounts 1─* bookings.account_id
+accounts 1─0..* opportunities.account_id
 accounts 1─* account_commission_payables   bookings 1─0..1 account_commission_payables.booking_id
+leads 1─0..1 opportunities.lead_id   users 1─* opportunities.owner_id
+pipeline_stages 1─* opportunities.stage_id
 bookings 1─0..1 invoices.booking_id        accounts 1─* invoices.account_id
 
 customer360 1─* bookings        customer360 1─* travellers
@@ -515,17 +519,49 @@ bookings produce no invoice — Phase 1 behaviour unchanged); VOID on cancel.
 | created_at / updated_at / version | | |
 
 Seeded defaults (kickoff weights): `QUALIFIED` (20%), `QUOTATION_SENT` (40%),
-`NEGOTIATION` (70%) — reference data an admin may edit. Opportunity rows that
-reference these stages arrive with Module 3 (V21), which will also make stage
-deletion a deactivation.
+`NEGOTIATION` (70%) — reference data an admin may edit. Referenced by
+`opportunities.stage_id` (Module 3, V21), which is why stage deletion is a
+deactivation rather than a `DELETE`.
 
-## 17. Booking-type decision
+## 17. Opportunities & forecast — Phase 7 Module 3 (`V21__opportunities_forecast.sql`)
+
+### `opportunities`
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| lead_id | uuid UNIQUE FK → `leads` | **one opportunity per lead** (service returns 409 on a second) |
+| account_id | uuid NULL FK → `accounts` | snapshotted from the lead for account-level rollups |
+| stage_id | uuid FK → `pipeline_stages` | the current stage; drives the forecast weight |
+| owner_id | uuid FK → `users` | snapshotted from `leads.owner_id` at create; ownership scoping basis |
+| expected_value | numeric(12,2) | `>= 0` (CHECK), the pipeline amount |
+| expected_date | date | target close date; the forecast window filters on this |
+| status | varchar | `OPEN` / `WON` / `LOST` (named CHECK) |
+| stage_moved_at | timestamptz | last stage change, for velocity reporting |
+| closed_at / closed_by / closing_note | | set together on close (`chk_opportunity_close_consistency`) |
+| created_at / updated_at / version | | |
+
+Indexes: `(owner_id, status)`, `stage_id`, `expected_date`, `lead_id`.
+
+**Close consistency** — `chk_opportunity_close_consistency` enforces
+`OPEN ⇒ closed_at/closed_by IS NULL` and `WON|LOST ⇒ both set`, so the terminal
+states cannot be recorded half-written at the database level (the service
+guards first, 409 on a second close or a post-close stage move).
+
+**Forecast is computed live**, not materialised: `GET /api/forecast?from&to`
+reads the scoped rows for the half-open `[from, to)` window on `expected_date`
+and aggregates `expected = Σ(value × stage_weight / 100)` (HALF_UP, scale 2),
+`best = Σ open value`, `won = Σ WON value`, grouped by stage and by month.
+Deliberate: re-weighting a stage changes every forecast immediately, so there
+is no rollup table to rebuild or drift from source. Rollup columns/tables are
+deferred — Module 5 will only add them if volume or latency requires it.
+
+## 18. Booking-type decision
 
 FIXED_BATCH vs CUSTOM_FIT is the **foundational schema decision** of the
 Phase-1 build (it shapes `trips`, `batches`, `seat_holds`, `bookings`, and
 the I1/I2/I3 invariants). Full rationale: **ADR `0001-booking-type-model`**.
 
-## 18. Change discipline
+## 19. Change discipline
 
 - Every new table/column ships as a new `V{n}__*.sql` in order — **never
   auto-DDL** (`ddl-auto: validate` enforces this).

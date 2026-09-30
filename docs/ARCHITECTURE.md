@@ -62,7 +62,7 @@ its original scaffold names; the mapping is exact and intentional:
 | `tasks` | `task` |
 | `audit` | `common.audit` (shared service) |
 | `documents` | `document` (entity only; workflows Phase 2) |
-| `accounts` | `accounts` (Phase 7 Module 1 + Module 2, shipped 2026-10-01) |
+| `accounts` | `accounts` (Phase 7 Modules 1–3: accounts, pipeline stages, opportunities/forecast, shipped 2026-10-01) |
 | `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2) |
 | `notifications` | `notification` (supporting module; canonical home is `communications`) |
 

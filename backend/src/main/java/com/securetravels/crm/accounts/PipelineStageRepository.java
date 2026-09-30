@@ -19,6 +19,8 @@ public interface PipelineStageRepository extends JpaRepository<PipelineStage, UU
 
     Optional<PipelineStage> findByStageKey(String stageKey);
 
+    Optional<PipelineStage> findByStageKeyAndActiveTrue(String stageKey);
+
     boolean existsByStageKey(String stageKey);
 
     boolean existsByStageKeyAndIdNot(String stageKey, UUID id);
