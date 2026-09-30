@@ -81,6 +81,10 @@ public class Lead extends Auditable {
     @Column(name = "customer360_id")
     private UUID customer360Id;
 
+    /** The account (corporate / travel agent) this enquiry belongs to, if any. */
+    @Column(name = "account_id")
+    private UUID accountId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.NEW;
@@ -147,6 +151,7 @@ public class Lead extends Auditable {
     public BigDecimal getBudget() { return budget; }
     public UUID getOwnerId() { return ownerId; }
     public UUID getCustomer360Id() { return customer360Id; }
+    public UUID getAccountId() { return accountId; }
     public Status getStatus() { return status; }
     public Heat getHeat() { return heat; }
     public LocalDate getFollowUpDate() { return followUpDate; }
@@ -171,6 +176,7 @@ public class Lead extends Auditable {
     public void setBudget(BigDecimal budget) { this.budget = budget; }
     public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
     public void setCustomer360Id(UUID customer360Id) { this.customer360Id = customer360Id; }
+    public void setAccountId(UUID accountId) { this.accountId = accountId; }
     public void setStatus(Status status) { this.status = status; }
     public void setHeat(Heat heat) { this.heat = heat; }
     public void setFollowUpDate(LocalDate followUpDate) { this.followUpDate = followUpDate; }

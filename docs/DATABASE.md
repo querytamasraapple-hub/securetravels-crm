@@ -3,8 +3,9 @@
 > **Single source of truth: `backend/src/main/resources/db/migration/`** —
 > Flyway applies schema, `ddl-auto: validate` prevents drift. This document
 > is a living map and must be updated in the same change as any new
-> migration. Migrations shipped: **V1 → V13** (V1–V12 Phase 1–2; V12 = Module 4
-> WhatsApp + timeline; **V13 = Phase 3 Module 2** reporting ledger + search).
+> migration. Migrations shipped: **V1 → V19** (V1–V12 Phase 1–2; V12 = Module 4
+> WhatsApp + timeline; **V13 = Phase 3 Module 2** reporting ledger + search;
+> V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts).
 
 Conventions used throughout:
 
@@ -109,6 +110,7 @@ Conventions used throughout:
 | trip_id | uuid FK → trips | |
 | travel_date | date | |
 | num_persons | int | 1..50 at API boundary |
+| account_id | uuid FK → accounts | **V19** — B2B/travel-agent account the lead belongs to |
 | budget | numeric(12,2) | `>= 0`, ≤12 int digits, ≤2 fraction digits |
 | owner_id | uuid FK → users | |
 | status | varchar(20) | `NEW → INTERESTED → QUOTATION_SENT → BOOKING_CONFIRMED` / `LOST` |
@@ -157,6 +159,7 @@ Conventions used throughout:
 | total_amount / discount_amount / tax_amount | numeric(12,2) | discounts require `discount_approved_by` at UI level |
 | status | varchar(20) | `QUOTATION, CONFIRMED, COMPLETED, CANCELLED` |
 | travel_date | date | |
+| account_id | uuid FK → accounts | **V19** — inherits `leads.account_id` at create; drives account invoicing/commissions |
 | discount_approved_by | uuid FK → users | |
 | notes / created_by | | |
 
@@ -419,6 +422,9 @@ guides 1─* batches.guide_id    guides 1─* operations_handoffs.guide_id
 leads 1─0..1 customer360        leads 1─0..1 duplicate leads
 leads 1─0..* bookings.lead_id   leads 1─* tasks.lead_id
 leads 1─* audit_log.lead        leads 1─* webhook_logs.lead_id
+accounts 1─* leads.account_id   accounts 1─* bookings.account_id
+accounts 1─* account_commission_payables   bookings 1─0..1 account_commission_payables.booking_id
+bookings 1─0..1 invoices.booking_id        accounts 1─* invoices.account_id
 
 customer360 1─* bookings        customer360 1─* travellers
 bookings 1─* travellers         bookings 1─* payments
@@ -432,13 +438,74 @@ whatsapp_templates 1─0..1 whatsapp_messages  (logical ref on template_code, no
 whatsapp_messages  1─0..* timeline_events     (same subject_type/subject_id, no FK)
 ```
 
-## 15. Booking-type decision
+## 15. Accounts & billing — Phase 7 Module 1 (`V19__accounts_and_links.sql`)
+
+Phase 7 nuance (tracked in `PHASE_7_DELTA.md`): the "invoicing"/"payables"
+this module ships are **account shapes only**. A minimal account-first invoice
+and the travel-agent commission payable exist so account-ledger behaviour can be
+verified end-to-end and regression-safe; full invoicing/payouts/P&L stay
+**Phase 9** per `ROADMAP.md`.
+
+### `accounts` (corporate / travel agent)
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| account_type | varchar(20) | `CORPORATE, TRAVEL_AGENT` (CHECK) |
+| name | varchar(200) | |
+| gstin | varchar(15) | full-format Indian GSTIN, **mod-36 checksum** (see SECURITY.md); null allowed |
+| billing_name / billing_address / city | varchar / text / varchar | invoice-to details |
+| primary_contact_name / email / phone | varchar | **PII — sanitized on write like customer data** |
+| bank_account_ref | varchar(40) | opaque reference, never full bank details |
+| credit_terms_days | int | `>= 0`, nullable |
+| notes | text | OWASP-sanitized |
+| is_active | boolean | inactive accounts cannot be linked to new leads/bookings |
+| created_at / updated_at / version | | |
+
+`leads.account_id` and `bookings.account_id` are nullable FKs set on create
+(inherited lead→booking); retail stays untouched.
+
+### `account_commission_payables` (what SecureTravels owes a travel agent)
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| booking_id | uuid **UNIQUE** FK | one payable per booking — the idempotency guard, mirroring `sales_commission_ledger` |
+| account_id | uuid FK → accounts | |
+| basis | varchar(10) | `NET, GROSS` (default NET) |
+| rate_percent | numeric(6,2) | |
+| gross / discount / tax / net / commission_amount | numeric(12,2) | commission = net × rate when basis NET |
+| status | varchar(20) | `OPEN, PAID, VOID` |
+| paid_at / paid_ref / settled_by (FK users) / notes | | settlement trail |
+| created_at / updated_at / version | | |
+
+Credited on booking **CONFIRMED** only when
+`app.feature-flags.partner-commissions=true` + account type `TRAVEL_AGENT` +
+`net > 0`; **VOID** (never delete) on cancel; **PAID** on settle (manager+).
+Default rate: `app.commission.default-travel-agent-percent` (10.00).
+
+### `invoices` (account-first, minimal)
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| invoice_ref | varchar(20) UNIQUE | `INV-YYYY-####` |
+| booking_id | uuid **UNIQUE** FK | one invoice per booking |
+| account_id | uuid FK → accounts | NULL while retail; billing entity below is authoritative |
+| billing_entity | varchar(20) | `ACCOUNT, RETAIL` (CHECK) |
+| billing_name / address / gstin | | snapshot of the account's billing details at issue |
+| gross / discount / tax / net_amount | numeric(12,2) | net = gross − discount + tax (matches ledger definition) |
+| status | varchar(20) | `ISSUED, VOID` |
+| issued_at / issued_by (FK users) / notes | | |
+| created_at / updated_at / version | | |
+
+Issued on CONFIRMED **only when the booking carries an account** (retail
+bookings produce no invoice — Phase 1 behaviour unchanged); VOID on cancel.
+
+## 16. Booking-type decision
 
 FIXED_BATCH vs CUSTOM_FIT is the **foundational schema decision** of the
 Phase-1 build (it shapes `trips`, `batches`, `seat_holds`, `bookings`, and
 the I1/I2/I3 invariants). Full rationale: **ADR `0001-booking-type-model`**.
 
-## 16. Change discipline
+## 17. Change discipline
 
 - Every new table/column ships as a new `V{n}__*.sql` in order — **never
   auto-DDL** (`ddl-auto: validate` enforces this).

@@ -73,12 +73,12 @@ class Phase1HardeningIT extends BaseIT {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         Future<BookingResponse> claimA = pool.submit(() -> {
             start.await();
-            return bookingService.create(new BookingCreateRequest(customerA, null, trip, batch,
+            return bookingService.create(new BookingCreateRequest(customerA, null, null, trip, batch,
                     null, 1, null, null, null), caller);
         });
         Future<BookingResponse> claimB = pool.submit(() -> {
             start.await();
-            return bookingService.create(new BookingCreateRequest(customerB, null, trip, batch,
+            return bookingService.create(new BookingCreateRequest(customerB, null, null, trip, batch,
                     null, 1, null, null, null), caller);
         });
         start.countDown();

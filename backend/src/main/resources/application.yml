@@ -123,6 +123,16 @@ app:
     max-active-runs-per-workflow: ${AUTOMATION_MAX_ACTIVE_RUNS_PER_WORKFLOW:0}
     # Hard stop on steps driven in a single coordinate pass (runaway BRANCH loop).
     coordinate-depth-cap: ${AUTOMATION_COORDINATE_DEPTH_CAP:10000}
+  feature-flags:
+    # Phase 7 Module 1 — travel-agent commission payables. Off by default so
+    # pre-Phase-7 booking behaviour (no payable side effects) is preserved until
+    # operations opts in. Invoices for account bookings are independent of this
+    # flag and are always created.
+    partner-commissions: ${PARTNER_COMMISSIONS_ENABLED:false}
+  commission:
+    # Phase 7 Module 1 — flat travel-agent rate until Module 4 ships per-plan
+    # commission tiers.
+    default-travel-agent-percent: ${COMMISSION_DEFAULT_TRAVEL_AGENT_PERCENT:10.00}
 
 management:
   endpoints:

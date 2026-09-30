@@ -41,6 +41,12 @@ app:
     rate-limit-per-workflow-per-minute: 0
     max-active-runs-per-workflow: 0
     coordinate-depth-cap: 10000
+  feature-flags:
+    # Phase 7 Module 1 — default OFF under test so full-suite behaviour is
+    # unchanged. AccountBillingFlowIT flips it on via @TestPropertySource.
+    partner-commissions: false
+  commission:
+    default-travel-agent-percent: 10.00
 logging:
   level:
     org.hibernate.SQL: OFF

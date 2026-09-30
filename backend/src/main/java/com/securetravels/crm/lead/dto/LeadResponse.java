@@ -22,6 +22,7 @@ public record LeadResponse(
         UUID ownerId,
         String ownerName,
         UUID customer360Id,
+        UUID accountId,
         Lead.Status status,
         Lead.Heat heat,
         LocalDate followUpDate,

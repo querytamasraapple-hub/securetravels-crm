@@ -1,5 +1,9 @@
 package com.securetravels.crm.booking;
 
+import com.securetravels.crm.accounts.Account;
+import com.securetravels.crm.accounts.AccountCommissionPayableService;
+import com.securetravels.crm.accounts.AccountInvoiceService;
+import com.securetravels.crm.accounts.AccountService;
 import com.securetravels.crm.booking.dto.BookingCreateRequest;
 import com.securetravels.crm.booking.dto.BookingResponse;
 import com.securetravels.crm.booking.dto.BookingStatusRequest;
@@ -7,6 +11,7 @@ import com.securetravels.crm.booking.dto.TravellerInput;
 import com.securetravels.crm.booking.dto.TravellerResponse;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditService;
+import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ConflictException;
 import com.securetravels.crm.common.exception.ForbiddenException;
@@ -83,6 +88,10 @@ public class BookingService {
     private final DiscountPolicy discountPolicy;
     private final CapacityAlertService capacityAlerts;
     private final CommissionLedgerService commissionLedger;
+    private final AccountService accounts;
+    private final AccountCommissionPayableService commissionPayables;
+    private final AccountInvoiceService invoices;
+    private final AppProperties appProperties;
     private final org.springframework.context.ApplicationEventPublisher events;
 
     public BookingService(BookingRepository bookings, TravellerRepository travellers,
@@ -92,7 +101,9 @@ public class BookingService {
                           OperationsService operationsService, Customer360Service customerService,
                           DiscountPolicy discountPolicy, CapacityAlertService capacityAlerts,
                           CommissionLedgerService commissionLedger,
-                      org.springframework.context.ApplicationEventPublisher events) {
+                          AccountService accounts, AccountCommissionPayableService commissionPayables,
+                          AccountInvoiceService invoices, AppProperties appProperties,
+                          org.springframework.context.ApplicationEventPublisher events) {
         this.bookings = bookings;
         this.travellers = travellers;
         this.seatHolds = seatHolds;
@@ -109,6 +120,10 @@ public class BookingService {
         this.discountPolicy = discountPolicy;
         this.capacityAlerts = capacityAlerts;
         this.commissionLedger = commissionLedger;
+        this.accounts = accounts;
+        this.commissionPayables = commissionPayables;
+        this.invoices = invoices;
+        this.appProperties = appProperties;
         this.events = events;
     }
 
@@ -120,6 +135,7 @@ public class BookingService {
         }
 
         UUID customerId = resolveCustomer(request, caller);
+        UUID accountId = resolveAccount(request);
         Trip trip = trips.findById(request.tripId())
                 .orElseThrow(() -> new NotFoundException("Trip not found: " + request.tripId()));
         BookingType type = BookingType.valueOf(trip.getBookingType().name());
@@ -152,6 +168,7 @@ public class BookingService {
         booking.setNotes(XssSanitizer.text(request.notes()));
         booking.setCreatedBy(caller.id());
         booking.setLeadId(request.leadId());
+        booking.setAccountId(accountId);
 
         if (type == BookingType.FIXED_BATCH) {
             booking = createFixedBatchBooking(request, booking, trip, numTravellers);
@@ -254,6 +271,22 @@ public class BookingService {
                 commissionLedger.credit(booking, lead, Instant.now());
             }
         }
+
+        // Phase 7, Module 1 — account-first billing. A confirmed booking that
+        // carries an account is invoiced to that account (retail bookings are
+        // left untouched). Travel-agent accounts additionally accrue a
+        // commission payable — but only while the partner-commissions flag is
+        // on, and never touching sales_commission_ledger, which measures a
+        // different thing (salesperson commission).
+        if (booking.getAccountId() != null) {
+            invoices.issueForBooking(booking, caller.id());
+            if (appProperties.getFeatureFlags().isPartnerCommissions()) {
+                Account account = accounts.findActiveAccount(booking.getAccountId());
+                if (account != null && account.getAccountType() == Account.AccountType.TRAVEL_AGENT) {
+                    commissionPayables.credit(booking, account, Instant.now());
+                }
+            }
+        }
         operationsService.onBookingConfirmed(booking, caller);
         customerService.maintainAggregates(booking.getCustomerId());
         publishBookingConfirmed(booking);
@@ -331,6 +364,14 @@ public class BookingService {
         if (oldStatus.equals(Booking.Status.CONFIRMED.name())) {
             commissionLedger.revoke(booking.getId(),
                     "Booking " + booking.getBookingRef() + " cancelled");
+            // Phase 7, Module 1: reverse the account billing side effects that a
+            // confirm created, with the same withdraw-never-delete semantics.
+            if (booking.getAccountId() != null) {
+                invoices.voidForBooking(booking.getId(),
+                        "Booking " + booking.getBookingRef() + " cancelled");
+                commissionPayables.voidForBooking(booking.getId(),
+                        "Booking " + booking.getBookingRef() + " cancelled");
+            }
         }
     }
 
@@ -409,6 +450,24 @@ public class BookingService {
 
     // ------------------------------------------------------------------ customer & refs
 
+    /** An explicit accountId must resolve to an active account; otherwise the
+     *  booking inherits the originating lead's account. */
+    private UUID resolveAccount(BookingCreateRequest request) {
+        if (request.accountId() != null) {
+            Account account = accounts.findActiveAccount(request.accountId());
+            if (account == null) {
+                throw new BadRequestException("Account not found or inactive: " + request.accountId());
+            }
+            return account.getId();
+        }
+        if (request.leadId() != null) {
+            return leads.findById(request.leadId())
+                    .map(Lead::getAccountId)
+                    .orElse(null);
+        }
+        return null;
+    }
+
     private UUID resolveCustomer(BookingCreateRequest request, UserPrincipal caller) {
         if (request.customerId() != null) {
             if (!customers.existsById(request.customerId())) {
@@ -459,6 +518,7 @@ public class BookingService {
                 booking.getBatchId(), departureDate, booking.getCustomerId(),
                 customer == null ? null : customer.getFullName(),
                 customer == null ? null : customer.getMobileNumber(),
+                booking.getAccountId(),
                 booking.getBookingType(), booking.getNumTravellers(), booking.getTotalAmount(),
                 booking.getDiscountAmount(), booking.getTaxAmount(), booking.netAmount(),
                 booking.getStatus(), booking.getTravelDate(), booking.getDiscountApprovedBy(),

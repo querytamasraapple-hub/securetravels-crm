@@ -46,6 +46,8 @@ public record LeadUpdateRequest(
         @Digits(integer = 12, fraction = 2)
         BigDecimal budget,
 
+        UUID accountId,
+
         @Future(message = "followUpDate must be in the future")
         LocalDate followUpDate,
 

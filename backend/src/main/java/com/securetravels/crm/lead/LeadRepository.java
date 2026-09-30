@@ -12,6 +12,8 @@ import java.util.UUID;
 
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
+    long countByAccountId(UUID accountId);
+
     /** Duplicate detection key — first non-LOST lead sharing the phone. */
     @Query("""
             select l from Lead l

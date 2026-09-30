@@ -166,6 +166,22 @@ closed from here.
 
 ---
 
+## Phase 7 Module 1 — accounts & commissions (2026-10-01)
+
+Phase 7 Module 1 (account records + Account 360 + minimal travel-agent
+commission/invoice) additions. Behavioral contract in `PHASE_7_DELTA.md` §7.
+
+| Control | Where |
+|---|---|
+| **Account mutation is MANAGER/ADMIN/CEO only** — enforced in `AccountService` (not just `@PreAuthorize`), SALES/OPS get read access to account 360; writes from SALES/OPS → `403 FORBIDDEN` | `AccountService`, `AccountController` |
+| **Account 360 detail** (records, stats, recent bookings, payables, invoices) is manager-gated in the service; list/read of an account is any authenticated user | `AccountService.detail` |
+| **GSTIN validation** — full Indian format (state code 01–37/38/97/99, PAN, entity `Z`, **mod-36 checksum**): validated on create/update; blank ⇒ stored NULL, present-but-invalid ⇒ `400`; duplicate GSTIN ⇒ `409 CONFLICT` | `common/util/GstinValidator`, `AccountService` |
+| **Account PII sanitized** — `primary_contact_name/email/phone`, `billing_address`, `notes` are OWASP-sanitized on write like customer data; not logged | `XssSanitizer`, `accounts/` DTOs |
+| **Commission payable gated by feature flag** `app.feature-flags.partner-commissions` (default **false**) — payments to travel agents are inert unless explicitly enabled; settlement (OPEN→PAID) is manager-gated | `AppProperties`, `account_commission_payables`, `AccountCommissionPayableService` |
+| **Settle trail** — PAID writes `paid_at`/`paid_ref`/`settled_by`; VOID never deletes, retained with reason; PAID payables are never un-settled (cancel on a PAID payable warns and leaves it) | `AccountCommissionPayableService` |
+| **Invoices my only for account bookings** — retail bookings produce no invoice (regression-safe); invoice issue/void keyed to `bookings.account_id` | `AccountInvoiceService` |
+| **Money stays `numeric(12,2)`**; commission = net × rate percent computed in the service, half-up at scale 2 | `AccountCommissionPayableService` |
+
 ## Operational notes
 
 - **Prod must override**: `JWT_SECRET`, `WEBHOOK_SECRET`, `DB_URL`/password, CORS, and

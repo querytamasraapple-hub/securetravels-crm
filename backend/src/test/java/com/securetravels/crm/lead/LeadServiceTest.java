@@ -43,6 +43,7 @@ class LeadServiceTest {
     @Mock private LeadScoringService scoringService;
     @Mock private FollowUpAutomation automation;
     @Mock private com.securetravels.crm.webhook.RoundRobinService roundRobin;
+    @Mock private com.securetravels.crm.accounts.AccountService accounts;
 
     private LeadService service;
     private UUID principalId;
@@ -51,7 +52,7 @@ class LeadServiceTest {
     @BeforeEach
     void setUp() {
         service = new LeadService(leads, users, customers, auditLogRepository, auditService,
-                scoringService, automation, roundRobin);
+                scoringService, automation, roundRobin, accounts);
         principalId = UUID.randomUUID();
         principal = new UserPrincipal(principalId, "sales@securetravels.in", "Ravi", Role.SALES, true);
     }
@@ -60,7 +61,7 @@ class LeadServiceTest {
         return new LeadCreateRequest(
                 "Amit Verma", "9876500001", "9876500001", "amit@example.com", Lead.Source.WHATSAPP,
                 "Kedarnath", null, LocalDate.now().plusDays(100), 2, new BigDecimal("15000"),
-                null, null, "call after noon", consent, null);
+                null, null, null, "call after noon", consent, null);
     }
 
     @Test

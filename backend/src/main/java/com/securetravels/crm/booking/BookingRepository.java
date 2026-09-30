@@ -70,4 +70,17 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     /** Confirmed bookings on a departure batch (compliance gate scope). */
     List<Booking> findByBatchIdAndStatus(UUID batchId, Booking.Status status);
+
+    // ------------------------------------------------------------------ accounts (Phase 7, Module 1)
+
+    long countByAccountId(UUID accountId);
+
+    long countByAccountIdAndStatusIn(UUID accountId, List<Booking.Status> statuses);
+
+    List<Booking> findTop5ByAccountIdOrderByCreatedAtDesc(UUID accountId);
+
+    @Query("select coalesce(sum(b.totalAmount - b.discountAmount + b.taxAmount), 0) from Booking b "
+            + "where b.accountId = :accountId and b.status in :statuses")
+    BigDecimal revenueForAccount(@Param("accountId") UUID accountId,
+                                 @Param("statuses") List<Booking.Status> statuses);
 }

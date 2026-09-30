@@ -1,5 +1,6 @@
 package com.securetravels.crm.lead;
 
+import com.securetravels.crm.accounts.AccountService;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditLog;
 import com.securetravels.crm.common.audit.AuditLogRepository;
@@ -63,11 +64,13 @@ public class LeadService {
     private final LeadScoringService scoringService;
     private final FollowUpAutomation automation;
     private final com.securetravels.crm.webhook.RoundRobinService roundRobin;
+    private final AccountService accounts;
 
     public LeadService(LeadRepository leads, UserRepository users, Customer360Repository customers,
                        AuditLogRepository auditLogRepository, AuditService auditService,
                        LeadScoringService scoringService, FollowUpAutomation automation,
-                       com.securetravels.crm.webhook.RoundRobinService roundRobin) {
+                       com.securetravels.crm.webhook.RoundRobinService roundRobin,
+                       AccountService accounts) {
         this.leads = leads;
         this.users = users;
         this.customers = customers;
@@ -76,6 +79,7 @@ public class LeadService {
         this.scoringService = scoringService;
         this.automation = automation;
         this.roundRobin = roundRobin;
+        this.accounts = accounts;
     }
 
     @Transactional
@@ -136,6 +140,7 @@ public class LeadService {
         if (customer != null) {
             lead.setCustomer360Id(customer.getId());
         }
+        lead.setAccountId(requireActiveAccount(request.accountId()));
         lead.setHeat(scoringService.score(lead));
 
         Lead saved = leads.save(lead);
@@ -300,6 +305,9 @@ public class LeadService {
         auditChanged(lead, "remarks", lead.getRemarks(), request.remarks(), v -> lead.setRemarks(v));
 
         // Rule-based scoring recomputes whenever enquiry fields change.
+        if (request.accountId() != null) {
+            lead.setAccountId(requireActiveAccount(request.accountId()));
+        }
         lead.setHeat(scoringService.score(lead));
         leads.save(lead);
         return toResponse(lead);
@@ -401,6 +409,15 @@ public class LeadService {
         return digits;
     }
 
+    private UUID requireActiveAccount(UUID accountId) {
+        if (accountId == null) return null;
+        com.securetravels.crm.accounts.Account account = accounts.findActiveAccount(accountId);
+        if (account == null) {
+            throw new BadRequestException("Account not found or inactive: " + accountId);
+        }
+        return account.getId();
+    }
+
     private LeadResponse toResponse(Lead lead) {
         String ownerName = lead.getOwnerId() == null ? null
                 : users.findById(lead.getOwnerId()).map(User::getFullName).orElse(null);
@@ -409,6 +426,7 @@ public class LeadService {
                 lead.getEmail(), lead.getSource(), lead.getDestination(), lead.getTripId(),
                 lead.getTravelDate(), lead.getNumPersons(), lead.getBudget(), lead.getOwnerId(), ownerName,
                 lead.getCustomer360Id(),
+                lead.getAccountId(),
                 lead.getStatus(), lead.getHeat(), lead.getFollowUpDate(), lead.getRemarks(),
                 lead.isConsentGiven(), lead.getConsentScope(), lead.getConsentCapturedAt(),
                 lead.getLostReason(), lead.getDuplicateOfLeadId(), lead.getLastContactedAt(),

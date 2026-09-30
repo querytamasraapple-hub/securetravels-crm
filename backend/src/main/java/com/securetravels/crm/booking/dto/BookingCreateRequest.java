@@ -12,12 +12,16 @@ import java.util.UUID;
 /**
  * Booking creation. Either {@code customerId} or {@code leadId} must be
  * given (checked in the service); a lead starts from the lead's linked
- * Customer360, created from the lead's consented PII when needed.
+ * Customer360, created from the lead's consented PII when needed. {@code
+ * accountId} is optional: when absent, a booking made from an
+ * account-linked lead inherits the lead's account.
  */
 public record BookingCreateRequest(
         UUID customerId,
 
         UUID leadId,
+
+        UUID accountId,
 
         @NotNull(message = "tripId is required")
         UUID tripId,

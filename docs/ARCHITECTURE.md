@@ -36,6 +36,7 @@ backend/src/main/java/com/securetravels/
 ├── audit/           (audit logging)                            — Phase 1
 ├── documents/       (compliance documents)                     — Phase 2
 ├── vendors/         (hotel/transport/vendor mgmt)              — Phase 2
+├── accounts/        (account records, 360, commissions)         — Phase 7
 ├── automation/      (workflow engine)                          — Phase 6
 ├── communications/  (WhatsApp/email/SMS hub)                   — Phase 5
 ├── marketing/       (Meta/Google integrations)                 — Phase 5
@@ -61,6 +62,7 @@ its original scaffold names; the mapping is exact and intentional:
 | `tasks` | `task` |
 | `audit` | `common.audit` (shared service) |
 | `documents` | `document` (entity only; workflows Phase 2) |
+| `accounts` | `accounts` (Phase 7 Module 1, shipped 2026-10-01) |
 | `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2) |
 | `notifications` | `notification` (supporting module; canonical home is `communications`) |
 

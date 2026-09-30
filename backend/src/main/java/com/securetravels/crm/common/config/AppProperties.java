@@ -3,6 +3,7 @@ package com.securetravels.crm.common.config;
 import com.securetravels.crm.trip.Trip;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 
@@ -21,6 +22,8 @@ public class AppProperties {
   private final Email email = new Email();
   private final Sms sms = new Sms();
     private final Automation automation = new Automation();
+    private final FeatureFlags featureFlags = new FeatureFlags();
+    private final Commission commission = new Commission();
     private boolean bootstrapDemoData = true;
 
     public Jwt getJwt() { return jwt; }
@@ -35,6 +38,8 @@ public class AppProperties {
   public Email getEmail() { return email; }
   public Sms getSms() { return sms; }
     public Automation getAutomation() { return automation; }
+    public FeatureFlags getFeatureFlags() { return featureFlags; }
+    public Commission getCommission() { return commission; }
     public boolean isBootstrapDemoData() { return bootstrapDemoData; }
     public void setBootstrapDemoData(boolean bootstrapDemoData) { this.bootstrapDemoData = bootstrapDemoData; }
 
@@ -373,5 +378,29 @@ public class AppProperties {
         }
         public int getCoordinateDepthCap() { return coordinateDepthCap; }
         public void setCoordinateDepthCap(int coordinateDepthCap) { this.coordinateDepthCap = coordinateDepthCap; }
+    }
+
+    /**
+     * Phase 7 — gates behind an explicit opt-in so pre-Phase-7 behaviour
+     * (no account billing side effects) stays the default until operations
+     * is ready for it.
+     */
+    public static class FeatureFlags {
+        private boolean partnerCommissions = false;
+
+        public boolean isPartnerCommissions() { return partnerCommissions; }
+        public void setPartnerCommissions(boolean partnerCommissions) { this.partnerCommissions = partnerCommissions; }
+    }
+
+    /** Phase 7 — commission configuration. Module 4 replaces the single
+     *  default rate with per-plan tiers; until then every travel-agent
+     *  payable is computed at this flat rate. */
+    public static class Commission {
+        private BigDecimal defaultTravelAgentPercent = new BigDecimal("10.00");
+
+        public BigDecimal getDefaultTravelAgentPercent() { return defaultTravelAgentPercent; }
+        public void setDefaultTravelAgentPercent(BigDecimal defaultTravelAgentPercent) {
+            this.defaultTravelAgentPercent = defaultTravelAgentPercent;
+        }
     }
 }

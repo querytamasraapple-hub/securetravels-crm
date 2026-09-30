@@ -59,6 +59,8 @@ public record LeadCreateRequest(
 
         UUID ownerId,
 
+        UUID accountId,
+
         @Future(message = "followUpDate must be in the future")
         LocalDate followUpDate,
 

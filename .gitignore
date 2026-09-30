@@ -57,3 +57,6 @@ osv-scanner*
 # OWASP reports (stored in TEMP outside repo, excluded as a safety net)
 owasp-evidence/
 dependency-check-report*
+
+# Backup copies of committed files — never stage
+*.bak

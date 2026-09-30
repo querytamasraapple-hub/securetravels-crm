@@ -20,6 +20,7 @@ public record BookingResponse(
         UUID customerId,
         String customerName,
         String customerPhone,
+        UUID accountId,
         BookingType bookingType,
         int numTravellers,
         BigDecimal totalAmount,

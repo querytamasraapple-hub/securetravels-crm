@@ -51,6 +51,10 @@ public class Booking extends Auditable {
     @Column(name = "customer_id", nullable = false)
     private UUID customerId;
 
+    /** The account (corporate / travel agent) a booking is billed to, if any. */
+    @Column(name = "account_id")
+    private UUID accountId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "booking_type", nullable = false, length = 30)
     private BookingType bookingType;
@@ -98,6 +102,7 @@ public class Booking extends Auditable {
     public UUID getTripId() { return tripId; }
     public UUID getBatchId() { return batchId; }
     public UUID getCustomerId() { return customerId; }
+    public UUID getAccountId() { return accountId; }
     public BookingType getBookingType() { return bookingType; }
     public int getNumTravellers() { return numTravellers; }
     public BigDecimal getTotalAmount() { return totalAmount; }
@@ -114,6 +119,7 @@ public class Booking extends Auditable {
     public void setTripId(UUID tripId) { this.tripId = tripId; }
     public void setBatchId(UUID batchId) { this.batchId = batchId; }
     public void setCustomerId(UUID customerId) { this.customerId = customerId; }
+    public void setAccountId(UUID accountId) { this.accountId = accountId; }
     public void setBookingType(BookingType bookingType) { this.bookingType = bookingType; }
     public void setNumTravellers(int numTravellers) { this.numTravellers = numTravellers; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
