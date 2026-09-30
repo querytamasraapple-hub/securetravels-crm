@@ -182,6 +182,16 @@ commission/invoice) additions. Behavioral contract in `PHASE_7_DELTA.md` §7.
 | **Invoices my only for account bookings** — retail bookings produce no invoice (regression-safe); invoice issue/void keyed to `bookings.account_id` | `AccountInvoiceService` |
 | **Money stays `numeric(12,2)`**; commission = net × rate percent computed in the service, half-up at scale 2 | `AccountCommissionPayableService` |
 
+Phase 7 Module 2 (pipeline stage configuration, same commit trail):
+
+| Control | Where |
+|---|---|
+| **Pipeline stage administration is MANAGER/ADMIN/CEO only** — enforced in `PipelineStageService`; SALES reads the active list | `PipelineStageService`, `PipelineStageController` |
+| **`includeInactive` listing is manager-gated** — a sales user cannot enumerate deactivated stages | `PipelineStageService.list` |
+| **Input validation** — key must match `^[A-Z][A-Z0-9_]*$`; weight bounded 0–100 (`DecimalMin/Max` + DB CHECK); label/entry-condition OWASP-sanitized | DTOs, `V20`, `XssSanitizer` |
+| **Integrity guards** — duplicate key or duplicate active sort order → `409 CONFLICT`; deleting/deactivating the sole remaining active stage refused (409); immutable key after create | `PipelineStageService` |
+| **Audited** — stage create/update/delete recorded in `audit_log` as `PIPELINE_STAGE` | `AuditService` |
+
 ## Operational notes
 
 - **Prod must override**: `JWT_SECRET`, `WEBHOOK_SECRET`, `DB_URL`/password, CORS, and

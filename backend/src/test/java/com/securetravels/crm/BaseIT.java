@@ -74,6 +74,20 @@ consent_records, consent_suppressions,
                    SET enabled = true,
                        approval_status = 'APPROVED'
                  WHERE enabled = false OR approval_status != 'APPROVED'""");
+
+        // pipeline_stages is seeded reference data (V20, the Phase 7 defaults)
+        // and its admin tests mutate rows, so restore the exactly-seeded set
+        // rather than truncate. Nothing references the rows yet (Module 3
+        // introduces opportunities); when it does, this must become a
+        // deactivate-only reset.
+        jdbcTemplate.update("DELETE FROM pipeline_stages");
+        jdbcTemplate.update("""
+                INSERT INTO pipeline_stages
+                    (id, stage_key, label, sort_order, probability_weight, entry_condition, is_active)
+                VALUES
+                    ('11111111-1111-4111-8111-111111111201', 'QUALIFIED', 'Qualified', 10, 20, 'Qualified inbound / B2B lead', true),
+                    ('11111111-1111-4111-8111-111111111202', 'QUOTATION_SENT', 'Quotation Sent', 20, 40, 'Quotation delivered to the prospect', true),
+                    ('11111111-1111-4111-8111-111111111203', 'NEGOTIATION', 'Negotiation', 30, 70, 'Active negotiation on price or dates', true)""");
     }
 
     /**

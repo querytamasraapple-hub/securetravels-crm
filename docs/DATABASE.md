@@ -3,9 +3,10 @@
 > **Single source of truth: `backend/src/main/resources/db/migration/`** —
 > Flyway applies schema, `ddl-auto: validate` prevents drift. This document
 > is a living map and must be updated in the same change as any new
-> migration. Migrations shipped: **V1 → V19** (V1–V12 Phase 1–2; V12 = Module 4
+> migration. Migrations shipped: **V1 → V20** (V1–V12 Phase 1–2; V12 = Module 4
 > WhatsApp + timeline; **V13 = Phase 3 Module 2** reporting ledger + search;
-> V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts).
+> V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts;
+> **V20 = Phase 7 Module 2** pipeline stages).
 
 Conventions used throughout:
 
@@ -499,13 +500,32 @@ Default rate: `app.commission.default-travel-agent-percent` (10.00).
 Issued on CONFIRMED **only when the booking carries an account** (retail
 bookings produce no invoice — Phase 1 behaviour unchanged); VOID on cancel.
 
-## 16. Booking-type decision
+## 16. Pipeline stages — Phase 7 Module 2 (`V20__pipeline_stages.sql`)
+
+### `pipeline_stages` (configurable opportunity stages)
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| stage_key | varchar(40) UNIQUE | immutable identity, uppercase snake_case |
+| label | varchar(80) | sanitized on write |
+| sort_order | int | `>= 0`; **unique among active stages** (partial unique index) for deterministic list order |
+| probability_weight | numeric(5,2) | `0–100`, the Module 3 forecast expected-value basis |
+| entry_condition | text | note, sanitized on write |
+| is_active | boolean | default true; at least one active must always remain (service guard) |
+| created_at / updated_at / version | | |
+
+Seeded defaults (kickoff weights): `QUALIFIED` (20%), `QUOTATION_SENT` (40%),
+`NEGOTIATION` (70%) — reference data an admin may edit. Opportunity rows that
+reference these stages arrive with Module 3 (V21), which will also make stage
+deletion a deactivation.
+
+## 17. Booking-type decision
 
 FIXED_BATCH vs CUSTOM_FIT is the **foundational schema decision** of the
 Phase-1 build (it shapes `trips`, `batches`, `seat_holds`, `bookings`, and
 the I1/I2/I3 invariants). Full rationale: **ADR `0001-booking-type-model`**.
 
-## 17. Change discipline
+## 18. Change discipline
 
 - Every new table/column ships as a new `V{n}__*.sql` in order — **never
   auto-DDL** (`ddl-auto: validate` enforces this).

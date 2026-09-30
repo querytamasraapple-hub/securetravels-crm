@@ -1,6 +1,6 @@
 # SecureTravels CRM — Phase 7 Step 0 Delta (Sales CRM Depth)
 
-> **Status: ratified 2026-10-01 (Step 0); Module 1 shipped 2026-10-01 (§7).**
+> **Status: ratified 2026-10-01 (Step 0); Module 1 + Module 2 shipped 2026-10-01 (§7, §8).**
 > This file is the overlap audit and
 > build plan for Phase 7 — Accounts (B2B/corporate/travel-agent), configurable
 > pipeline stages, revenue forecasting, and commission calculation. It records
@@ -209,3 +209,36 @@ and the support changes below.
   `invoices`. `Lead`/`Booking` entities + DTOs carry `accountId`.
 
 Module 2 (pipeline stages) is next.
+
+## 8. Module 2 — shipped 2026-10-01
+
+Shipped in the same commit as this update: `V20__pipeline_stages.sql`, the
+`PipelineStage` entity/repository/service/controller + DTOs, and
+`PipelineStageFlowIT`.
+
+- **Schema** — `pipeline_stages` (immutable `stage_key` UNIQUE, `label`,
+  `sort_order >= 0`, `probability_weight numeric(5,2)` CHECK 0–100,
+  `entry_condition` text, `is_active`), seeded with the kickoff defaults
+  (Qualified 20 / Quotation Sent 40 / Negotiation 70) under fixed ids.
+  A **partial unique index on `sort_order WHERE is_active`** makes list order
+  deterministic; the service turns key/slot collisions into `409 CONFLICT`.
+- **Package** — lives in `com.securetravels.crm.accounts` per §3.1 (the Phase 7
+  boundary), served at `GET/POST /api/pipeline-stages`,
+  `GET/PATCH/DELETE /api/pipeline-stages/{id}`.
+- **RBAC** — reads (active list, by id) any authenticated user; writes,
+  deactivation, and `?includeInactive=true` listing are MANAGER–CEO (enforced
+  in `PipelineStageService`).
+- **Guards** — cannot deactivate **or** delete the last remaining active stage;
+  `key` is immutable after create; weights/sort validated at DTO + DB; entries
+  OWASP-sanitized; create/update/delete audited as `PIPELINE_STAGE`.
+- **Tests** — `PipelineStageFlowIT`: seeded-order list with weights,
+  unordered insert, validation (150 weight, bad key, empty label), duplicate
+  key/slot → 409, reorder + deactivate + last-active refusal, inactive listing
+  gating (sales → 403), sales read-only, 404. Full suite green (493 tests,
+  0 failures, 11 skipped — Rabbit/Docker).
+- **BaseIT** — `pipeline_stages` is reference data (like `whatsapp_templates` /
+  `channel_templates`): not truncated; instead the seeded set is restored
+  before each test (delete-all + re-insert the three defaults). When Module 3
+  adds opportunity FKs this must become a deactivate-only reset.
+
+Module 3 (opportunities + revenue forecast) is next.
