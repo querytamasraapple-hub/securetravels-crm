@@ -62,10 +62,51 @@ class SalesReportingFlowIT extends BaseIT {
         // 80000*70%
         assertThat(negotiation.get("weightedValue").asDouble()).isEqualTo(56000.0);
 
-        JsonNode totals = parse(resp).get("totals");
-        assertThat(totals.get("openCount").asLong()).isEqualTo(3);
+JsonNode totals = parse(resp).get("totals");
+assertThat(totals.get("openCount").asLong()).isEqualTo(3);
 assertThat(totals.get("openValue").asDouble()).isEqualTo(230000.0);
-        assertThat(totals.get("weightedValue").asDouble()).isEqualTo(86000.0);
+assertThat(totals.get("weightedValue").asDouble()).isEqualTo(86000.0);
+    }
+
+    /**
+     * The window is optional on this report, and a half-supplied one is rejected
+     * rather than quietly widened to everything.
+     *
+     * <p>Found by the Phase 7 hardening gate: a SALES caller asking for their own
+     * pipeline health got a 400 telling them to pick a window, while the endpoint
+     * contract said the window was optional. {@code openOutsideWindow} is what
+     * keeps an optional window honest - a windowed report says how much open
+     * pipeline it left out.
+     */
+    @Test
+    void pipelineWindowIsOptionalButMustBeSuppliedAsAPair() throws Exception {
+        String manager = managerToken();
+        String sales = salesToken();
+
+        createOpportunity(sales, "In Window", "+919700000041", "QUALIFIED", 100000, "2026-11-05");
+        createOpportunity(sales, "Out Of Window", "+919700000042", "QUALIFIED", 70000, "2027-03-05");
+
+        // No window at all: everything is in scope, nothing is excluded.
+        String all = mockMvc.perform(get("/api/analytics/pipeline")
+                        .header("Authorization", authHeader(manager)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(parse(all).get("from").isNull()).isTrue();
+        assertThat(parse(all).get("totals").get("openCount").asLong()).isEqualTo(2);
+        assertThat(parse(all).get("totals").get("openOutsideWindow").asLong()).isZero();
+
+        // A window excludes the March deal, and says so instead of hiding it.
+        JsonNode windowed = parse(pipeline(manager, "2026-11-01", "2026-12-01"));
+        assertThat(windowed.get("totals").get("openCount").asLong()).isEqualTo(1);
+        assertThat(windowed.get("totals").get("openOutsideWindow").asLong()).isEqualTo(1);
+
+        // Half a window is a client bug, not a request for everything.
+        for (String[] half : new String[][]{{"from", "2026-11-01"}, {"to", "2026-12-01"}}) {
+            mockMvc.perform(get("/api/analytics/pipeline")
+                            .header("Authorization", authHeader(manager))
+                            .param(half[0], half[1]))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Test
@@ -306,7 +347,45 @@ assertThat(report.get("plans")).hasSize(2);
         assertThat(findPlan(report.get("plans"), "DEFAULT_FLAT_RATE").get("payables").asLong()).isEqualTo(1);
         assertThat(findPlan(report.get("plans"), "DEFAULT_FLAT_RATE").get("accrued").asDouble()).isEqualTo(6000.0);
         assertThat(findPlan(report.get("plans"), "MIXED_TERMS").get("accrued").asDouble()).isEqualTo(6000.0);
-        assertThat(report.get("totals").get("accounts").asLong()).isEqualTo(2);
+assertThat(report.get("totals").get("accounts").asLong()).isEqualTo(2);
+        assertThat(report.get("totals").get("accrued").asDouble()).isEqualTo(12000.0);
+    }
+
+    /**
+     * One account that changed plans is one account, however many rows it takes.
+     *
+     * <p>Rows are grouped by account and plan because a payable keeps the terms it
+     * was struck under, so an account that was reassigned mid-history legitimately
+     * appears twice. The {@code accounts} total is a count of partners paid, and
+     * counting rows there would have inflated it to 2 for a single agent - a
+     * number that goes into a commission report a manager reconciles by hand.
+     */
+    @Test
+    void partnerCommissionTotalsCountAccountsNotAccountPlanRows() throws Exception {
+        String manager = managerToken();
+        String sales = salesToken();
+
+        UUID agent = createAccount(manager, "TRAVEL_AGENT", "Reassigned Agent");
+        UUID trip = createTrip(manager, "Reassigned Trek", 30000);
+
+        // First booking under the flat fallback, then the account is given terms.
+        confirmBooking(sales, createLead(sales, agent, "Before Terms", "+919700000045"), trip);
+        UUID planId = createPercentPlan(manager, "LATER_TERMS", 10, null);
+        assign(manager, agent, planId);
+        confirmBooking(sales, createLead(sales, agent, "After Terms", "+919700000046"), trip);
+
+        JsonNode report = parse(mockMvc.perform(get("/api/analytics/partner-commissions")
+                        .header("Authorization", authHeader(manager))
+                        .param("from", today().toString()).param("to", today().plusDays(1).toString()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+
+        // Two rows, two plans, two payables - and one account.
+        assertThat(report.get("accounts")).hasSize(2);
+        assertThat(report.get("plans")).hasSize(2);
+        assertThat(report.get("totals").get("payables").asLong()).isEqualTo(2);
+        assertThat(report.get("totals").get("accounts").asLong()).isEqualTo(1);
+        // 10% flat on the first, 10% under the plan on the second.
         assertThat(report.get("totals").get("accrued").asDouble()).isEqualTo(12000.0);
     }
 

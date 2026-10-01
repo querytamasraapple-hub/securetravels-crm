@@ -92,6 +92,10 @@ public class SalesReportingService {
      * was earlier. Open deals with no expected date in the window are excluded
      * from the stage rows entirely and reported as {@code openOutsideWindow} in
      * the totals, so nothing vanishes silently.
+     *
+     * <p>The window itself is optional: omit both bounds and this reports the
+     * whole book, which is what a health check wants and what a client should not
+     * have to compute a date range to get.
      */
     @Transactional(readOnly = true)
     public PipelineReportResponse pipelineReport(UUID ownerId,
@@ -99,7 +103,7 @@ public class SalesReportingService {
                                                  LocalDate to,
                                                  Integer staleAfterDays,
                                                  UserPrincipal caller) {
-        requireWindow(from, to);
+        validateOptionalWindow(from, to);
         int staleDays = staleAfterDays == null ? DEFAULT_STALE_AFTER_DAYS : staleAfterDays;
         if (staleDays < 1 || staleDays > 365) {
             throw new BadRequestException("staleAfterDays must be between 1 and 365");
@@ -207,20 +211,27 @@ public class SalesReportingService {
 
         // Open deals whose expected date is outside the window are counted in the
         // totals so the reader can see the stage rows are not the whole pipeline.
-        StringBuilder outsideScope = new StringBuilder();
-        if (effectiveOwner != null) {
-            outsideScope.append(" and o.owner_id = :ownerId");
+        // With no window there is nothing to be outside of, so the count is zero by
+        // definition -- running the query without the exclusion clause instead
+        // would report every open deal as "excluded", which is the one number here
+        // that must never be a lie.
+        long openOutsideWindow = 0;
+        if (from != null) {
+            StringBuilder outsideScope = new StringBuilder();
+            if (effectiveOwner != null) {
+                outsideScope.append(" and o.owner_id = :ownerId");
+            }
+            String outsideSql = """
+                    select count(*) as n
+                      from opportunities o
+                     where o.status = 'OPEN'
+                       and not (o.expected_date >= :from and o.expected_date < :to) %s
+                    """.formatted(outsideScope);
+            openOutsideWindow = asLong(jdbc.queryForMap(outsideSql, p).get("n"));
         }
-        String outsideSql = """
-                select count(*) as n
-                  from opportunities o
-                 where o.status = 'OPEN' %s
-                   %s
-                """.formatted(from == null ? "" : "and not (o.expected_date >= :from and o.expected_date < :to)", outsideScope);
-        long openOutsideWindow = asLong(jdbc.queryForMap(outsideSql, p).get("n"));
 
         PipelineReportResponse.Totals totals = new PipelineReportResponse.Totals(
-                totalOpen, openValue, weighted, totalWon, wonValue,
+                totalOpen, openValue, weighted, openOutsideWindow, totalWon, wonValue,
                 totalLost, lostValue, totalStale, pct(totalWon, totalWon + totalLost));
 
         return new PipelineReportResponse(scopeLabel(caller), effectiveOwner, from, to, staleDays, stages, totals);
@@ -357,7 +368,7 @@ public class SalesReportingService {
         ForecastReportResponse.ValueBasis basis = new ForecastReportResponse.ValueBasis(
                 "expected = sum(open expected_value * stage probability_weight / 100), HALF_UP at scale 2",
                 "best = sum(open expected_value) in the half-open window [from, to)",
-                "won = sum(expected_value of WON opportunities dated in the window",
+                "won = sum(expected_value of WON opportunities closed in [from, to))",
                 true, true);
 
         return new ForecastReportResponse(scopeLabel(caller), effectiveOwner, from, to, basis,
@@ -502,16 +513,22 @@ public class SalesReportingService {
         BigDecimal paid = money(0);
         BigDecimal open = money(0);
         BigDecimal voided = money(0);
+        // Rows are grouped by account AND plan, so one account that changed plans
+        // mid-history contributes more than one row. Counting rows would report
+        // that single account twice in a field that says "accounts"; the distinct
+        // set is the number of partners the money actually went to.
+        java.util.Set<UUID> distinctAccounts = new java.util.HashSet<>();
         for (PartnerCommissionReportResponse.Account a : accounts) {
             totalPayables += a.payables();
             accrued = accrued.add(a.accrued());
             paid = paid.add(a.paid());
             open = open.add(a.openLiability());
             voided = voided.add(a.voidedAmount());
+            distinctAccounts.add(a.accountId());
         }
 
         PartnerCommissionReportResponse.Totals totals = new PartnerCommissionReportResponse.Totals(
-                accounts.size(), totalPayables, accrued, paid, open, voided,
+                distinctAccounts.size(), totalPayables, accrued, paid, open, voided,
                 pctOfExpected(paid, accrued),
                 totalPayables == 0 ? money(0)
                         : accrued.divide(BigDecimal.valueOf(totalPayables), 2, RoundingMode.HALF_UP));
@@ -530,6 +547,23 @@ public class SalesReportingService {
         }
         if (!from.isBefore(to)) {
             throw new BadRequestException("Window must satisfy from < to");
+        }
+    }
+
+    /**
+     * Pipeline health is a standing question about the book as it is, so its
+     * window is optional: both bounds absent means the whole pipeline, and a
+     * half-specified window is a client bug worth naming rather than silently
+     * widening to everything. The forecast and commission reports keep
+     * {@link #requireWindow} because an all-time horizon is meaningless for
+     * either.
+     */
+    private static void validateOptionalWindow(LocalDate from, LocalDate to) {
+        if ((from == null) != (to == null)) {
+            throw new BadRequestException("from and to must be supplied together, or both omitted");
+        }
+        if (from != null) {
+            requireWindow(from, to);
         }
     }
 

@@ -401,9 +401,13 @@ carries its own visibility rule.
 - **Empty is zero, not null.** Money and counts are `0.00`; percentages are `null`
   when the denominator is zero, because "0% of 0 deals" and "no deals in scope" are
   different facts.
-- **Missing vs bad window.** `from`/`to` are declared `required = false` so an
-  omitted parameter fails through the service's own validation with a clear message
-  instead of surfacing as a framework 500.
+- **Window is required where a horizon is the question, optional where health is.**
+  Forecast and partner commission need a period, so omitting `from`/`to` is a 400
+  with the report's own message - they are declared `required = false` so the
+  client sees that message instead of a framework 500. Pipeline health is a
+  standing question about the book as it is, so omitting both means the whole
+  pipeline; supplying only one is still a 400, because silently widening a
+  half-specified filter is worse than refusing it.
 
 **Tests** — `SalesReportingFlowIT` (8): weighted pipeline math (150000 @ 20% =
 30000, 80000 @ 70% = 56000), staleness via a backdated `stage_moved_at` with
@@ -416,3 +420,74 @@ sitting alongside a real plan, SALES/OPS 403, and empty-report semantics. Full
 suite green: 528 tests, 0 failures, 11 skipped.
 
 Remaining Phase 7 work: the four hardening gates and `docs/PHASE_7_SIGNOFF.md`.
+
+---
+
+## 12. Hardening gates
+
+`Phase7HardeningIT` (4 tests) states the four gates in the order the plan lists
+them. None of it is new functionality: each test restates a guarantee Phase 7
+claimed and proves it through the HTTP API end to end. The per-module tests
+answer module questions; these answer the phase question.
+
+### Gate 1 - commission correctness, including tiered boundaries
+
+`gate1_tieredBoundaryIsInclusiveAtTheLastDigit`: the same trip and party size,
+one booking with a 0.01 discount (net 49999.99) and one without (net 50000.00).
+49999.99 stays on the 5% band; exactly 50000 moves to 10%.
+
+The assertion that matters is `ratePercent`, not `commissionAmount`: at 49999.99
+the 5% result is 2499.9995, which rounds HALF_UP to the same 2500.00 as a
+would-be off-by-one, so only the recorded rate reveals which band was selected.
+A `>` instead of `>=` in the band comparator passes on the amount and fails on
+the rate.
+
+### Gate 2 - pipeline validation
+
+`gate2_invalidTransitionsAreRefusedAndEntryConditionsAreAdvisory`: an unknown
+stage key is 404, moving or re-closing a terminal opportunity is 409, a second
+opportunity on one lead is 409.
+
+**And the one guarantee Phase 7 did not fully keep**, recorded in the test name
+rather than papered over: `pipeline_stages.entry_condition` is free text
+("Qualified inbound / B2B lead"). It is stored, XSS-sanitised and returned to
+clients, but it is never evaluated. It is a note for the humans configuring a
+pipeline, not a rule the server checks. The stronger test - posting an
+opportunity whose lead plainly fails "B2B lead" and asserting rejection - would
+have to lie, because the condition is prose. Machine-evaluated entry conditions
+need a condition vocabulary to evaluate against and are Phase 9 scope.
+
+### Gate 3 - commission visibility, 403 across owners
+
+`gate3_commissionIsInvisibleEvenToTheRepWhoEarnedIt`: the rep who booked the
+trip can read their own pipeline report and cannot read the payable, the
+invoice, the aggregate report, or the plan terms behind them, and cannot settle.
+A second rep is refused identically, which shows the boundary is a role rule and
+not an ownership accident. The manager settles and the settlement is attributed.
+
+### Gate 4 - account invoicing, no retail regression
+
+`gate4_retailBookingsInheritNoInvoiceOrCommission`: an account booking produces
+exactly one invoice carrying the account's GSTIN; a retail booking on the same
+trip and price produces no invoice and no payable, and its `account_id` is
+asserted `NULL` so this is policy rather than coincidence.
+
+This is the gate that found real work. Module 1 covered the agent case and never
+asserted the absence of the retail one, so nothing stood between the invoicing
+policy and every walk-in customer in the database receiving a GST invoice.
+
+### Bugs the gates found
+
+| Bug | Symptom | Fix |
+| --- | --- | --- |
+| `pipelineReport` rejected the window it documented as optional | A SALES caller asking for their own pipeline health got 400 "from and to are required", though the endpoint contract says the window is optional and the SQL already supported its absence | `validateOptionalWindow`: both bounds absent means the whole book; a half-supplied window is 400, because widening it silently is worse than refusing |
+| `openOutsideWindow` counted every open deal when no window was given | The exclusion clause was dropped from the SQL but the `count(*)` still ran, reporting 2 excluded deals when nothing was excluded | Skip the query when there is no window; the field is 0 by definition. A field that says "excluded" must never be a lie |
+| `totals.accounts` counted rows, not accounts | Rows are grouped by account *and* plan, so one account reassigned mid-history reported 2 accounts | Count distinct `account_id`. `plan_id IS NULL` rows stay visible under `DEFAULT_FLAT_RATE`; this is a count, not a hiding fix |
+
+Both reporting fixes carry regression tests in `SalesReportingFlowIT`
+(`pipelineWindowIsOptionalButMustBeSuppliedAsAPair`,
+`partnerCommissionTotalsCountAccountsNotAccountPlanRows`), so a later change
+cannot quietly restore either.
+
+`SalesReportingFlowIT` grew from 8 to 10 tests. Full suite: 534 tests, 0
+failures, 11 skipped.

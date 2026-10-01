@@ -55,11 +55,17 @@ public record PipelineReportResponse(
      * Won value only counts deals that closed inside the window; open value is
      * not window-limited by expected_date because an open deal's expected date is
      * a target, not an event.
+     *
+     * @param openOutsideWindow  open deals the window excluded, so the stage rows
+     *                           are never mistaken for the whole pipeline. Always 0
+     *                           when no window was supplied, since an unwindowed
+     *                           report excludes nothing.
      */
     public record Totals(
             long openCount,
             BigDecimal openValue,
             BigDecimal weightedValue,
+            long openOutsideWindow,
             long wonCount,
             BigDecimal wonValue,
             long lostCount,
