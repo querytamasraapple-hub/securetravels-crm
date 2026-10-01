@@ -3,11 +3,12 @@
 > **Single source of truth: `backend/src/main/resources/db/migration/`** —
 > Flyway applies schema, `ddl-auto: validate` prevents drift. This document
 > is a living map and must be updated in the same change as any new
-> migration. Migrations shipped: **V1 → V21** (V1–V12 Phase 1–2; V12 = Module 4
+> migration. Migrations shipped: **V1 → V22** (V1–V12 Phase 1–2; V12 = Module 4
 > WhatsApp + timeline; **V13 = Phase 3 Module 2** reporting ledger + search;
 > V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts;
 > **V20 = Phase 7 Module 2** pipeline stages; **V21 = Phase 7 Module 3**
-> opportunities + revenue forecast).
+> opportunities + revenue forecast; **V22 = Phase 7 Module 4** commission plans
+> + tiers + account assignment).
 
 Conventions used throughout:
 
@@ -555,13 +556,56 @@ Deliberate: re-weighting a stage changes every forecast immediately, so there
 is no rollup table to rebuild or drift from source. Rollup columns/tables are
 deferred — Module 5 will only add them if volume or latency requires it.
 
-## 18. Booking-type decision
+## 18. Commission plans - Phase 7 Module 4 (`V22__commission_plans.sql`)
+
+### `commission_plans` (partner payout terms)
+
+| column | notes |
+| --- | --- |
+| `plan_key` | UNIQUE, uppercase snake_case; **immutable after creation** |
+| `label` | human name shown in UI/exports |
+| `basis` | `NET` = gross − discount + tax, `GROSS` = undiscounted gross |
+| `method` | `PERCENT`, `FIXED`, `TIERED` |
+| `rate_percent` | `numeric(5,2)`, required for `PERCENT` |
+| `fixed_amount` | `numeric(12,2)`, required for `FIXED` |
+| `min_sales_threshold` | inclusive floor; below it no payable is written |
+| `active` | soft delete — a plan with history stays readable |
+| `notes`, `created_at`, `updated_at`, `version` | audit surface |
+
+`chk_commission_plan_method_inputs` enforces the input shape at the database
+level, not only in the service: `PERCENT` ⇒ `rate_percent` NOT NULL,
+`FIXED` ⇒ `fixed_amount` NOT NULL, `TIERED` ⇒ both NULL.
+
+### `commission_tiers` (banded rates for `TIERED`)
+
+`plan_id` FK **ON DELETE CASCADE**, `from_amount`, `to_amount`
+(NULL = open-ended), `rate_percent`; unique on `(plan_id, from_amount)`.
+Bands are contiguous half-open `[from, to)` intervals that must start at 0 and
+end open-ended — enforced in `CommissionPlanService` (a DB-level check cannot
+see rows from other bands), which rejects gaps, overlaps, a closed top band, and
+an open-ended band that would shadow later bands.
+
+### `account_commission_plans` (which account runs on which plan)
+
+`account_id` FK, `plan_id` FK, `assigned_by`, `assigned_at`, `active`.
+Partial unique index `idx_account_commission_plans_active` enforces **one active
+plan per account**. Re-assignment deactivates the previous row instead of updating
+it: the history records which terms an earlier booking was confirmed under, which
+is also why a plan with any assignment history cannot be deleted (409 → deactivate).
+
+### `account_commission_payables.plan_id`
+
+Added in V22 so every payable records the plan that produced it. NULL means the
+flat `app.commission.default-travel-agent-percent` fallback applied. Historical
+payables keep the terms they were accrued under even after a re-assignment.
+
+## 19. Booking-type decision
 
 FIXED_BATCH vs CUSTOM_FIT is the **foundational schema decision** of the
 Phase-1 build (it shapes `trips`, `batches`, `seat_holds`, `bookings`, and
 the I1/I2/I3 invariants). Full rationale: **ADR `0001-booking-type-model`**.
 
-## 19. Change discipline
+## 20. Change discipline
 
 - Every new table/column ships as a new `V{n}__*.sql` in order — **never
   auto-DDL** (`ddl-auto: validate` enforces this).

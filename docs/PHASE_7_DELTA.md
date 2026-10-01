@@ -285,4 +285,63 @@ Shipped in the same commit as this update: `V21__opportunities_forecast.sql`, th
   validation, stage and month bucketing (43000 expected / 70000 best / 8000 won).
   Full suite green (498 tests, 0 failures, 11 skipped — Rabbit/Docker).
 
-Module 4 (commission plans) is next.
+## 10. Module 4 — shipped 2026-10-01
+
+Commission is no longer "flat rate × net, hardcoded". It is a per-account
+**commission plan**, still falling back to the Module 1 flat rate when an account
+has none, so no existing behaviour regresses.
+
+- **Schema (V22)** — `commission_plans` (`plan_key` UNIQUE uppercase snake_case,
+  `label`, `basis` NET/GROSS, `method` PERCENT/FIXED/TIERED, `rate_percent`
+  numeric(5,2), `fixed_amount` numeric(12,2), `min_sales_threshold numeric(12,2)`,
+  `active`, `notes`, audit columns) with `chk_commission_plan_method_inputs`
+  enforcing that PERCENT carries a rate, FIXED a fee, and TIERED neither;
+  `commission_tiers` (`plan_id` FK **ON DELETE CASCADE**, `from_amount`,
+  `to_amount` NULL = open-ended, `rate_percent`) unique on `(plan_id, from_amount)`;
+  `account_commission_plans` (`account_id` FK, `plan_id` FK, `assigned_by`,
+  `assigned_at`, `active`) with partial unique `idx_account_commission_plans_active`
+  (one active row per account); `account_commission_payables.plan_id` FK added for
+  provenance.
+- **Package** — new `com.securetravels.crm.commission`. The payable ledger stays in
+  `accounts`; plans only change *how* the amount is derived.
+- **Calculation** — `CommissionCalculator` is pure (no Spring, no clock), so the
+  arithmetic is unit-testable at exact boundaries. `NET = gross − discount + tax`;
+  `GROSS` ignores the discount. Tiers are contiguous half-open `[from, to)` bands
+  starting at 0 with a mandatory open-ended top band. Rate math is HALF_UP at
+  scale 2; amounts stay `numeric(12,2)`.
+- **Threshold** — a plan's `min_sales_threshold` is **inclusive**: at exactly the
+  threshold the booking still pays. Below it no payable row is written (a row that
+  can never be settled is ledger noise) and the skip is logged.
+- **Assignment** — only `TRAVEL_AGENT` accounts can hold a plan (corporate → 400).
+  Re-assignment **supersedes**: the old row is deactivated, never updated or
+  deleted, because it records which terms an earlier booking was confirmed under.
+  The deactivation is `saveAndFlush`-ed before the insert — Hibernate otherwise
+  issues the INSERT first and the partial unique index rejects it.
+- **Guards** — plan `key` is immutable after creation (400); duplicate key → 409;
+  tier gaps/overlaps/closed top/early open-ended band → 400; a plan that has
+  payables or assignment history cannot be deleted (409, deactivate instead) and
+  cannot have its method changed while in use (409); a plan that is *actively*
+  assigned cannot be deactivated (409); assigning an inactive plan → 409; unknown
+  account/plan → 404. Terms are audited field-by-field (`basis`, `method`,
+  `rate_percent`, `fixed_amount`, `min_sales_threshold`, assignment changes).
+- **RBAC** — plan CRUD, assignment, and quote are manager-and-up (SALES/OPS → 403).
+  Quote preview (`POST /api/commission-plans/accounts/{id}/quote`) shows a manager
+  what an account *would* be paid, including the `DEFAULT_FLAT_RATE` fallback
+  (`planKey: "DEFAULT_FLAT_RATE"`) when nothing is assigned.
+- **Security follow-up** — the Module 1 docs claimed payables/invoices were
+  manager-gated "in the service", but only the controller had `isAuthenticated()`.
+  `listForAccount` (payables and invoices), `get` (invoice) and `markPaid` now take
+  the `UserPrincipal` and enforce manager-and-up themselves, so the invariant does
+  not rest on an annotation.
+- **Tests** — `CommissionCalculatorTest` (8) pins the arithmetic: exact tier
+  boundaries (49999.99 → 5%, 50000 → 10%, 100000 → 15%), HALF_UP half-cent,
+  NET/GROSS with a discount, FIXED, and the threshold edge. `CommissionPlanFlowIT`
+  (14) drives the HTTP surface: tiered accrual on confirm (80000 → 10% = 8000 with
+  `planId` on the payable), flat fallback, threshold suppression *and* the
+  inclusive edge, GROSS ignoring a discount, FIXED paying 3000 on a 250000 booking,
+  re-assignment keeping the old terms on the earlier payable, corporate rejection,
+  five tier-shape rejections, unique/immutable/audited keys, in-use delete and
+  deactivate conflicts, unused-plan delete, inactive-plan assignment, and RBAC over
+  plans/assignments/quotes/payables/invoices for SALES and OPS.
+
+Module 5 (reporting & analytics) is next.

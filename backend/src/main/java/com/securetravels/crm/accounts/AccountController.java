@@ -95,7 +95,7 @@ public class AccountController {
     @GetMapping(value = "/{id}/payables", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
     public List<CommissionPayableResponse> payables(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
-        return payables.listForAccount(id);
+        return payables.listForAccount(id, caller);
     }
 
     @Operation(summary = "Settle an OPEN payable (managers)", security = @SecurityRequirement(name = "bearerAuth"))
@@ -104,7 +104,7 @@ public class AccountController {
     public void settle(@PathVariable UUID id, @PathVariable UUID payableId,
                        @RequestBody(required = false) @Valid PayableSettleRequest request,
                        @CurrentUser UserPrincipal caller) {
-        payables.markPaid(payableId, caller.id(),
+        payables.markPaid(payableId, caller,
                 request == null || request.paidRef() == null ? null : request.paidRef(), Instant.now());
     }
 
@@ -112,13 +112,13 @@ public class AccountController {
     @GetMapping(value = "/{id}/invoices", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
     public List<InvoiceResponse> invoices(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
-        return invoices.listForAccount(id);
+        return invoices.listForAccount(id, caller);
     }
 
     @Operation(summary = "Get an invoice", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping(value = "/invoices/{invoiceId}", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
-    public InvoiceResponse invoice(@PathVariable UUID invoiceId) {
-        return invoices.get(invoiceId);
+    public InvoiceResponse invoice(@PathVariable UUID invoiceId, @CurrentUser UserPrincipal caller) {
+        return invoices.get(invoiceId, caller);
     }
 }

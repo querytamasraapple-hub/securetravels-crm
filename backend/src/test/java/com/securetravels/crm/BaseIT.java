@@ -48,6 +48,7 @@ consent_records, consent_suppressions,
                  automation_events, workflow_runs, workflow_run_steps,
                  workflow_scheduled_steps, workflow_step_effects, workflow_run_failures,
                  accounts, account_commission_payables, invoices,
+                 commission_plans, commission_tiers, account_commission_plans,
                  opportunities
                   RESTART IDENTITY CASCADE""");
         // NB: whatsapp_templates is deliberately NOT truncated. It is reference

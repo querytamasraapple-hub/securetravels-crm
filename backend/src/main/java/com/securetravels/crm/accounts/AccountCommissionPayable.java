@@ -24,7 +24,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "account_commission_payables", indexes = {
         @Index(name = "idx_commission_payables_account_status", columnList = "account_id, status"),
-        @Index(name = "idx_commission_payables_status", columnList = "status")
+        @Index(name = "idx_commission_payables_status", columnList = "status"),
+        @Index(name = "idx_commission_payables_plan", columnList = "plan_id")
 })
 public class AccountCommissionPayable extends Auditable {
 
@@ -41,6 +42,14 @@ public class AccountCommissionPayable extends Auditable {
 
     @Column(name = "account_id", nullable = false)
     private UUID accountId;
+
+    /**
+     * Phase 7 Module 4 — the plan whose terms produced this amount. Null for
+     * payables written before plans existed (flat default rate). Kept on the
+     * row so editing a plan never rewrites what was already owed.
+     */
+    @Column(name = "plan_id")
+    private UUID planId;
 
     @Column(name = "payable_at", nullable = false)
     private Instant payableAt;
@@ -88,6 +97,8 @@ public class AccountCommissionPayable extends Auditable {
     public void setBookingId(UUID bookingId) { this.bookingId = bookingId; }
     public UUID getAccountId() { return accountId; }
     public void setAccountId(UUID accountId) { this.accountId = accountId; }
+    public UUID getPlanId() { return planId; }
+    public void setPlanId(UUID planId) { this.planId = planId; }
     public Instant getPayableAt() { return payableAt; }
     public void setPayableAt(Instant payableAt) { this.payableAt = payableAt; }
     public Basis getBasis() { return basis; }

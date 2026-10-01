@@ -19,6 +19,13 @@ public interface AccountCommissionPayableRepository extends JpaRepository<Accoun
 
     List<AccountCommissionPayable> findByAccountIdAndStatus(UUID accountId, AccountCommissionPayable.Status status);
 
+    /**
+     * Phase 7 Module 4 — whether any payable was written under this plan. A plan
+     * that has already produced money cannot be deleted or have its method
+     * reinterpreted.
+     */
+    boolean existsByPlanId(UUID planId);
+
     @Query("select coalesce(sum(p.commissionAmount), 0) from AccountCommissionPayable p "
             + "where p.accountId = :accountId and p.status = 'OPEN'")
     BigDecimal sumOpenByAccount(@Param("accountId") UUID accountId);

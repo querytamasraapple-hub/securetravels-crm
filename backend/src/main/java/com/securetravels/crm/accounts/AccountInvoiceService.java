@@ -2,8 +2,11 @@ package com.securetravels.crm.accounts;
 
 import com.securetravels.crm.accounts.dto.InvoiceResponse;
 import com.securetravels.crm.booking.Booking;
+import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.exception.NotFoundException;
+import com.securetravels.crm.user.UserPrincipal;
 import com.securetravels.crm.common.util.XssSanitizer;
+import com.securetravels.crm.user.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,7 +14,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -28,6 +33,8 @@ public class AccountInvoiceService {
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(AccountInvoiceService.class);
+
+    private static final Set<Role> MANAGER_AND_UP = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO);
 
     private final AccountInvoiceRepository invoices;
     private final AccountRepository accounts;
@@ -92,17 +99,26 @@ public class AccountInvoiceService {
         });
     }
 
+    /** Manager-and-up: invoices are customer-facing money documents. */
     @Transactional(readOnly = true)
-    public List<InvoiceResponse> listForAccount(UUID accountId) {
+    public List<InvoiceResponse> listForAccount(UUID accountId, UserPrincipal caller) {
+        requireManager(caller);
         return invoices.findByAccountIdOrderByIssuedAtDesc(accountId).stream()
                 .map(AccountInvoiceService::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public InvoiceResponse get(UUID id) {
+    public InvoiceResponse get(UUID id, UserPrincipal caller) {
+        requireManager(caller);
         return toResponse(invoices.findById(id)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + id)));
+    }
+
+    private static void requireManager(UserPrincipal caller) {
+        if (!MANAGER_AND_UP.contains(caller.role())) {
+            throw new ForbiddenException("Invoices are restricted to managers");
+        }
     }
 
     /** INV-YYYY-#### — zero-padded, so string ordering equals numeric ordering. */

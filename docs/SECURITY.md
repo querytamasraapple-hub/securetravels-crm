@@ -205,6 +205,22 @@ Phase 7 Module 3 (opportunities + revenue forecast, same commit trail):
 | **Forecast leaks nothing across owners** — the forecast query is scoped exactly like the list; window must satisfy `from < to` else `400`, and the window is half-open `[from, to)` so buckets never double-count | `OpportunityService.forecast` |
 | **Audited** — create as `OPPORTUNITY`; stage moves and outcomes as `statusChange` on the `stage`/`status` field | `AuditService` |
 
+Phase 7 Module 4 (commission plans, same commit trail):
+
+| Control | Where |
+|---|---|
+| **Commission terms are MANAGER/ADMIN/CEO only** — plan CRUD, assignment, unassignment and the quote preview are role-checked in `CommissionPlanService`, not only by `@PreAuthorize`; SALES/OPS → `403 FORBIDDEN`. A partner's payout terms are not sales-visible data | `CommissionPlanService.requireManager`, `CommissionPlanController` |
+| **Money views are manager-and-up in the service** — `listForAccount` (payables and invoices), invoice `get`, and `markPaid` now take the `UserPrincipal` and enforce the role themselves. Module 1 documented this as service-enforced while only the controller annotation existed; the annotation is defence in depth, not the control | `AccountCommissionPayableService`, `AccountInvoiceService`, `AccountController` |
+| **Plans cannot be assigned to the wrong kind of account** — only `TRAVEL_AGENT` accounts may hold a commission plan; `CORPORATE`/other → `400 BAD_REQUEST` | `CommissionPlanService.requireCommissionableAccount` |
+| **Terms provenance is append-only** — reassignment supersedes (deactivates) the previous assignment row instead of editing it, and `account_commission_payables.plan_id` records which plan produced each payable, so historic payables keep the terms they were accrued under | `CommissionPlanService.assign`, `account_commission_plans` |
+| **Deletion cannot destroy money history** — a plan with any payables or assignment history cannot be deleted (`409 CONFLICT`, deactivate instead), cannot have its `method` changed while in use, and cannot be deactivated while actively assigned | `CommissionPlanService.delete/update`, `isInUse`, `hasActiveAssignment` |
+| **Plan key is immutable** and UNIQUE uppercase snake_case; duplicate key → `409`; `includeInactive` listing is manager-gated | `CommissionPlanUpdateRequest`, `CommissionPlanService` |
+| **Tier shape is validated server-side** — contiguous half-open bands from 0 with a mandatory open-ended top band; gap, overlap, closed top, or a shadowing open-ended band → `400`, so no booking amount can fall outside the priced range | `CommissionPlanService.requireValidTiers`, `CommissionCalculator` |
+| **Method input shape constrained by the database** — `chk_commission_plan_method_inputs` requires a rate for `PERCENT`, a fee for `FIXED`, and neither for `TIERED`; bounds 0–100% via `DecimalMin/Max` + CHECK | `V22`, plan DTOs |
+| **Calculation is pure and money-typed** — `CommissionCalculator` has no Spring/clock dependency; rate math is HALF_UP at scale 2 on `numeric(12,2)`, and the minimum-sales threshold is inclusive | `CommissionCalculator`, `CommissionQuote` |
+| **Accrual stays idempotent** — one payable per booking (`booking_id` UNIQUE, re-entry returns the existing row); below-threshold bookings write **no** row (a row that can never be settled is ledger noise) and log the skip | `AccountCommissionPayableService.credit` |
+| **Audited** — plan terms field-by-field (`basis`, `method`, `rate_percent`, `fixed_amount`, `min_sales_threshold`) plus `account_assigned`/`account_unassigned` as `COMMISSION_PLAN` | `AuditService` |
+
 ## Operational notes
 
 - **Prod must override**: `JWT_SECRET`, `WEBHOOK_SECRET`, `DB_URL`/password, CORS, and

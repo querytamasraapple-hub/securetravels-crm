@@ -36,7 +36,8 @@ backend/src/main/java/com/securetravels/
 ├── audit/           (audit logging)                            — Phase 1
 ├── documents/       (compliance documents)                     — Phase 2
 ├── vendors/         (hotel/transport/vendor mgmt)              — Phase 2
-├── accounts/        (accounts, 360, pipeline, commissions)       — Phase 7
+├── accounts/        (accounts, 360, pipeline, payables)          — Phase 7
+├── commission/      (commission plans, tiers, calculation)         — Phase 7
 ├── automation/      (workflow engine)                          — Phase 6
 ├── communications/  (WhatsApp/email/SMS hub)                   — Phase 5
 ├── marketing/       (Meta/Google integrations)                 — Phase 5
@@ -63,7 +64,7 @@ its original scaffold names; the mapping is exact and intentional:
 | `audit` | `common.audit` (shared service) |
 | `documents` | `document` (entity only; workflows Phase 2) |
 | `accounts` | `accounts` (Phase 7 Modules 1–3: accounts, pipeline stages, opportunities/forecast, shipped 2026-10-01) |
-| `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2) |
+| `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2 sales ledger) + `commission` (Phase 7 Module 4 partner plans) |
 | `notifications` | `notification` (supporting module; canonical home is `communications`) |
 
 Rename-to-canonical is a **refactor only**, to be executed when a module

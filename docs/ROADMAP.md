@@ -44,9 +44,10 @@ the same phase.
   is where Kafka/event-streaming gets evaluated for the first time if
   automation volume genuinely requires it.
 - **Phase 7 — Sales CRM Depth (IN PROGRESS, build started 2026-10-01; Modules 1
-  Accounts, 2 Pipeline Stages, and 3 Opportunities/Forecast shipped 2026-10-01,
-  Module 4 Commission Plans next)**: Accounts for B2B/corporate,
-  Opportunities/Pipeline configurability, Forecasting, Commission calculation.
+  Accounts, 2 Pipeline Stages, 3 Opportunities/Forecast and 4 Commission Plans all
+  shipped 2026-10-01, Module 5 Reporting/Analytics next)**: Accounts for
+  B2B/corporate, Opportunities/Pipeline configurability, Forecasting, Commission
+  calculation.
 - **Phase 8 — Service/Support Module**: Tickets, complaints, knowledge base
   (only if post-sale support volume justifies a dedicated module — reassess
   at this point whether it's actually needed).
