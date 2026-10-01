@@ -26,7 +26,12 @@
         <bucket4j.version>8.10.1</bucket4j.version>
         <owasp-sanitizer.version>20260101.1</owasp-sanitizer.version>
         <tomcat.version>10.1.59</tomcat.version>
-        <jackson-bom.version>2.21.5</jackson-bom.version>
+        <!-- 2.21.5 -> 2.21.7: CVE-2026-91777 (GHSA-cxp5-3px4-pw24), quadratic
+             forward-reference completion DoS in databind. Affected range is
+             <= 2.21.6 with no 2.21.x release before 2.21.7 carrying the fix, so
+             the whole BOM moves together rather than databind alone: core and
+             datatype must not be left behind. -->
+        <jackson-bom.version>2.21.7</jackson-bom.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
         <log4j2.version>2.25.5</log4j2.version>
         <postgresql.version>42.7.12</postgresql.version>
