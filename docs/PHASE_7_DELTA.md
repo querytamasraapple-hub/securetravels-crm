@@ -345,3 +345,74 @@ has none, so no existing behaviour regresses.
   plans/assignments/quotes/payables/invoices for SALES and OPS.
 
 Module 5 (reporting & analytics) is next.
+
+## 11. Module 5 — shipped 2026-10-01
+
+Three reports over the Phase 7 tables, in a new `SalesReportingService`
+(`analytics/`) rather than folded into the 1000-line `AnalyticsService`: the
+Phase 3 Module 2 reports are lead/trip/team shaped and share one filter object,
+these three read `opportunities` and `account_commission_payables`, and each
+carries its own visibility rule.
+
+- **`GET /api/analytics/pipeline`** — pipeline health per stage: open count/value,
+  weighted value, mean dwell time (`stage_moved_at`), stale-deal count, and
+  won/lost with a win rate. `staleAfterDays` is a parameter (default 30, range
+  1–365). The query is driven **from** `pipeline_stages` with a LEFT JOIN so an
+  empty stage still returns a row — a health board that hides the stage nobody is
+  quoting in is hiding the problem. Scope and window live in the `ON` clause, not
+  `WHERE`, which would silently degrade it to an inner join for a scoped caller.
+- **`GET /api/analytics/forecast`** — monthly buckets plus the two cuts a manager
+  actually asks for, which Module 3's forecast lacked: by owner, and stage *mix*
+  (share of expected value). Adds a `valueBasis` block so the payload documents
+  its own expected/best/won formulas, half-open window and live weighting, and
+  reports `openOutsideWindow` so a reader can see what was excluded and why: an
+  OPEN deal whose expected date falls outside the window is not assigned to a
+  month it is not expected in. `pipelineCoveragePct` is the sum of stage weights
+  holding open value (capped at 100) — below 100% means part of the forecast sits
+  in stages that cannot be won.
+- **`GET /api/analytics/partner-commissions`** — commission per account and per
+  plan from the payable ledger, split into accrued / paid / open liability /
+  voided. **Never netted**: a VOID payable is reported in its own column, because
+  VOID-not-delete exists precisely so a reversal stays visible. Payables with
+  `plan_id IS NULL` group under the synthetic key `DEFAULT_FLAT_RATE`, so moving
+  an account onto a plan cannot make its earlier commission disappear from a
+  per-plan rollup. `effectiveRatePercent` is the rate of the most recent accrual
+  and is labelled as such, not as the plan's current terms.
+
+**Decisions worth recording**
+
+- **No rollup tables.** V23 is indexes only, for the reason Module 3 gave: a report
+  worth recomputing should be recomputed, and a stored total is a second source of
+  truth that can only drift. A test asserts this directly — it re-weights a stage
+  with a bare `UPDATE` and requires the next forecast response to change. If a
+  rollup is ever introduced, that test fails.
+- **Window semantics differ per report, deliberately.** Pipeline and forecast
+  window on `expected_date` for OPEN deals and `closed_at` for terminal ones, so a
+  deal that closed in the period counts even when its expected date was earlier.
+  Partner commission windows on `payable_at`, because that is when the liability
+  was created.
+- **LOST is excluded from forecast** and counted only in the pipeline report: it is
+  a terminal outcome, not pipeline, and counting it would inflate the forecast.
+- **Visibility is per report, not global.** Pipeline and forecast follow
+  `AnalyticsService`: SALES pinned to their own rows, OPS and above see all.
+  Partner commission is MANAGER-and-up and is re-checked in the service, not only by
+  the annotation — a report that aggregated Module 4's money would otherwise reopen
+  the exact hole Module 4 closed, in aggregate form.
+- **Empty is zero, not null.** Money and counts are `0.00`; percentages are `null`
+  when the denominator is zero, because "0% of 0 deals" and "no deals in scope" are
+  different facts.
+- **Missing vs bad window.** `from`/`to` are declared `required = false` so an
+  omitted parameter fails through the service's own validation with a clear message
+  instead of surfacing as a framework 500.
+
+**Tests** — `SalesReportingFlowIT` (8): weighted pipeline math (150000 @ 20% =
+30000, 80000 @ 70% = 56000), staleness via a backdated `stage_moved_at` with
+`staleAfterDays` proven to be a parameter, half-open forecast buckets with a deal
+sitting exactly on the exclusive bound, stage-mix shares (63.6/36.4), **live
+re-weighting moving the forecast**, cross-owner scoping for two SALES users across
+both reports, window validation, partner commission paid/open/void separation
+(40000 accrued = 10000 open + 10000 void + 20000 paid), the flat-fallback bucket
+sitting alongside a real plan, SALES/OPS 403, and empty-report semantics. Full
+suite green: 528 tests, 0 failures, 11 skipped.
+
+Remaining Phase 7 work: the four hardening gates and `docs/PHASE_7_SIGNOFF.md`.

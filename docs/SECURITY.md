@@ -221,6 +221,18 @@ Phase 7 Module 4 (commission plans, same commit trail):
 | **Accrual stays idempotent** — one payable per booking (`booking_id` UNIQUE, re-entry returns the existing row); below-threshold bookings write **no** row (a row that can never be settled is ledger noise) and log the skip | `AccountCommissionPayableService.credit` |
 | **Audited** — plan terms field-by-field (`basis`, `method`, `rate_percent`, `fixed_amount`, `min_sales_threshold`) plus `account_assigned`/`account_unassigned` as `COMMISSION_PLAN` | `AuditService` |
 
+Phase 7 Module 5 (sales reporting, same commit trail):
+
+| Control | Where |
+|---|---|
+| **Report visibility is decided per report, not globally** — pipeline and forecast follow `AnalyticsService` (SALES pinned to their own rows, OPS/manager and above see all); partner commission is MANAGER-and-up because it aggregates money owed to a third party. A SALES caller passing another consultant's `ownerId` has it overwritten with their own id in the service, so the parameter cannot widen scope | `SalesReportingService.pipelineReport/forecastReport/partnerCommissionReport` |
+| **Partner commission is manager-and-up in the service, not only on the controller** — same reasoning as the Module 4 money views: a report that aggregated payables would otherwise reopen that hole in aggregate form, and there is no per-caller narrowing that would make a broad role safe | `SalesReportingService.partnerCommissionReport` |
+| **Reversals are never netted away** — VOID payables are reported in their own column with their own amount, because `VOID`-not-delete exists so a cancellation stays visible. A netted "total owed" figure would absorb exactly the event an auditor looks for | `PartnerCommissionReportResponse.Account` |
+| **Commission provenance is never dropped from a rollup** — payables with `plan_id IS NULL` (Module 1 flat fallback) group under `DEFAULT_FLAT_RATE` rather than disappearing, so assigning a plan later cannot rewrite history | `SalesReportingService.partnerCommissionReport` |
+| **Nothing is pre-aggregated** — V23 adds indexes only; no report total is stored. Re-weighting a stage or changing a plan changes the next report response with no write to a rollup, enforced by a test | `V23`, `SalesReportingFlowIT` |
+| **Window inputs are validated, not trusted** — `from < to` required, half-open `[from, to)` so adjacent periods cannot double count; a missing parameter fails through the same validation rather than as a framework 500; `staleAfterDays` bounded to 1–365 | `SalesReportingService.requireWindow`, `pipelineReport` |
+| **Only parameters are ever bound** — every filter is a `MapSqlParameterSource` value; no window, key or id is concatenated into SQL | `SalesReportingService` |
+
 ## Operational notes
 
 - **Prod must override**: `JWT_SECRET`, `WEBHOOK_SECRET`, `DB_URL`/password, CORS, and

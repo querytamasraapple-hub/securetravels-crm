@@ -64,7 +64,7 @@ its original scaffold names; the mapping is exact and intentional:
 | `audit` | `common.audit` (shared service) |
 | `documents` | `document` (entity only; workflows Phase 2) |
 | `accounts` | `accounts` (Phase 7 Modules 1–3: accounts, pipeline stages, opportunities/forecast, shipped 2026-10-01) |
-| `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2 sales ledger) + `commission` (Phase 7 Module 4 partner plans) |
+| `reporting` | `dashboard` (Phase-1 subset), `analytics` + `commission` (Phase 3 Module 2 sales ledger), `analytics` (Phase 7 Module 5 pipeline/forecast/partner-commission reports) + `commission` (Phase 7 Module 4 partner plans) |
 | `notifications` | `notification` (supporting module; canonical home is `communications`) |
 
 Rename-to-canonical is a **refactor only**, to be executed when a module

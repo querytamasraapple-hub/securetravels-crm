@@ -2,7 +2,10 @@ package com.securetravels.crm.analytics;
 
 import com.securetravels.crm.analytics.dto.AuditSearchResponse;
 import com.securetravels.crm.analytics.dto.CustomerInsightsResponse;
+import com.securetravels.crm.analytics.dto.ForecastReportResponse;
 import com.securetravels.crm.analytics.dto.OperationsReadinessResponse;
+import com.securetravels.crm.analytics.dto.PartnerCommissionReportResponse;
+import com.securetravels.crm.analytics.dto.PipelineReportResponse;
 import com.securetravels.crm.analytics.dto.ReportFilter;
 import com.securetravels.crm.analytics.dto.SalesFunnelResponse;
 import com.securetravels.crm.analytics.dto.TeamPerformanceResponse;
@@ -37,9 +40,11 @@ import java.time.LocalDate;
 public class AnalyticsController {
 
     private final AnalyticsService service;
+    private final SalesReportingService reporting;
 
-    public AnalyticsController(AnalyticsService service) {
+    public AnalyticsController(AnalyticsService service, SalesReportingService reporting) {
         this.service = service;
+        this.reporting = reporting;
     }
 
     @GetMapping("/funnel")
@@ -139,5 +144,62 @@ public class AnalyticsController {
             @RequestParam(defaultValue = "25") int size,
             @CurrentUser UserPrincipal caller) {
         return service.searchAudit(q, entity, actorId, from, to, page, size, caller);
+    }
+
+    // ==================================================================
+    // Phase 7 Module 5 - sales reporting
+    // ==================================================================
+
+    /**
+     * Pipeline health per stage: value, dwell time and staleness.
+     *
+     * <p>Window optional here: with no {@code from}/{@code to} the report covers
+     * the whole pipeline, which is the right default for a health check.
+     */
+    @GetMapping("/pipeline")
+    @PreAuthorize("hasAnyRole('SALES', 'OPS', 'MANAGER', 'ADMIN', 'CEO')")
+    public PipelineReportResponse pipeline(
+            @RequestParam(required = false) java.util.UUID ownerId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Integer staleAfterDays,
+            @CurrentUser UserPrincipal caller) {
+        return reporting.pipelineReport(ownerId, from, to, staleAfterDays, caller);
+    }
+
+    /**
+     * Monthly forecast with owner and stage-mix cuts. Window required.
+     *
+     * <p>{@code from}/{@code to} are declared optional here so a missing
+     * parameter fails the same way a bad one does, with the report's own
+     * "from and to are required" message, instead of surfacing as a framework
+     * error the client has to special-case.
+     */
+    @GetMapping("/forecast")
+    @PreAuthorize("hasAnyRole('SALES', 'OPS', 'MANAGER', 'ADMIN', 'CEO')")
+    public ForecastReportResponse forecast(
+            @RequestParam(required = false) java.util.UUID ownerId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @CurrentUser UserPrincipal caller) {
+        return reporting.forecastReport(ownerId, from, to, caller);
+    }
+
+    /**
+     * Partner commission per account and per plan.
+     *
+     * <p>MANAGER and up, like the Module 4 plan endpoints and the payables list:
+     * this aggregates money owed to third parties, so the boundary is drawn at
+     * the endpoint and re-checked in the service. There is no per-caller
+     * narrowing that would make a broader role safe.
+     */
+    @GetMapping("/partner-commissions")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public PartnerCommissionReportResponse partnerCommissions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) java.util.UUID accountId,
+            @CurrentUser UserPrincipal caller) {
+        return reporting.partnerCommissionReport(from, to, accountId, caller);
     }
 }

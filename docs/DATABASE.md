@@ -8,7 +8,8 @@
 > V14–V18 = Phase 6 automation/observability; **V19 = Phase 7 Module 1** accounts;
 > **V20 = Phase 7 Module 2** pipeline stages; **V21 = Phase 7 Module 3**
 > opportunities + revenue forecast; **V22 = Phase 7 Module 4** commission plans
-> + tiers + account assignment).
+> + tiers + account assignment; **V23 = Phase 7 Module 5** reporting indexes —
+> indexes only, no tables).
 
 Conventions used throughout:
 
@@ -599,13 +600,33 @@ Added in V22 so every payable records the plan that produced it. NULL means the
 flat `app.commission.default-travel-agent-percent` fallback applied. Historical
 payables keep the terms they were accrued under even after a re-assignment.
 
-## 19. Booking-type decision
+## 19. Reporting read support - Phase 7 Module 5 (`V23__sales_reporting.sql`)
+
+**Indexes only, no tables and no columns.** The pipeline, forecast and partner
+commission reports are all computed live from the tables above; nothing is
+pre-aggregated. The reasoning is Module 3's: re-weighting a stage or changing a
+commission plan must move the report immediately, and a stored total is a second
+source of truth that can only drift from the rows it summarises. Correctness
+never depends on these indexes — they only keep the scans cheap.
+
+| index | serves |
+| --- | --- |
+| `idx_opportunities_stage_status (stage_id, status)` | pipeline report, three status counts per stage in one scan |
+| `idx_opportunities_expected_status (expected_date, status)` | forecast month buckets, OPEN vs WON in one scan |
+| `idx_opportunities_stage_moved (stage_id, stage_moved_at)` | dwell time and the stale-deal cutoff |
+| `idx_commission_payables_payable_at (payable_at)` | partner commission time window (V19's indexes cannot serve a date range) |
+| `idx_commission_payables_plan_status (plan_id, status)` | per-plan rollup and the paid/open split |
+
+Nothing here is referenced by a foreign key or by the write path, so V23 is safe
+to apply to a live database.
+
+## 20. Booking-type decision
 
 FIXED_BATCH vs CUSTOM_FIT is the **foundational schema decision** of the
 Phase-1 build (it shapes `trips`, `batches`, `seat_holds`, `bookings`, and
 the I1/I2/I3 invariants). Full rationale: **ADR `0001-booking-type-model`**.
 
-## 20. Change discipline
+## 21. Change discipline
 
 - Every new table/column ships as a new `V{n}__*.sql` in order — **never
   auto-DDL** (`ddl-auto: validate` enforces this).
