@@ -48,9 +48,12 @@ the same phase.
   5 Reporting/Analytics all shipped 2026-10-01; hardening gates + sign-off
   next)**: Accounts for B2B/corporate, Opportunities/Pipeline configurability,
   Forecasting, Commission calculation.
-- **Phase 8 — Service/Support Module**: Tickets, complaints, knowledge base
-  (only if post-sale support volume justifies a dedicated module — reassess
-  at this point whether it's actually needed).
+- **Phase 8 — Service/Support Module** (CONDITIONAL — reassessed 2026-10-01 in
+  `PHASE_8_REASSESSMENT.md`: **not justified at this gate, deferred with
+  re-evaluation triggers; no Phase 8 code was written.**): Tickets, complaints,
+  knowledge base — only if post-sale support volume justifies a dedicated module.
+  Re-run the gate at the Phase 9 checkpoint, or immediately if a support request
+  is being tracked somewhere outside this system.
 - **Phase 9 — Finance Depth**: Full invoicing, vendor payouts, commission,
   GST/statutory reporting, trip-level P&L, receivables/payables.
 - **Phase 10 — Advanced Analytics/BI**: Cross-module dashboards (CEO/Sales
