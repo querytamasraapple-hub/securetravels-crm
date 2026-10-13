@@ -33,20 +33,35 @@ const HEAT_STYLE: Record<string, string> = {
 type LeadBoardProps = {
   leads: Lead[];
   tripsById: Map<string, Trip>;
-  onStatusChange: (id: string, payload: LeadStatusPayload) => Promise<void>;
+  onStatusChange?: (id: string, payload: LeadStatusPayload) => Promise<void>;
   onOpen: (id: string) => void;
+  /** When false, cards are not draggable (read-only pipeline view). */
+  canWrite?: boolean;
 };
 
-function LeadCard({ lead, tripsById, onClick }: { lead: Lead; tripsById: Map<string, Trip>; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id ?? "" });
+function LeadCard({
+  lead,
+  tripsById,
+  onClick,
+  canWrite = true,
+}: {
+  lead: Lead;
+  tripsById: Map<string, Trip>;
+  onClick: () => void;
+  canWrite?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: lead.id ?? "",
+    disabled: !canWrite,
+  });
   const trip = lead.tripId ? tripsById.get(lead.tripId) : undefined;
   const heat = lead.heat ?? "COLD";
 
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
+      {...(canWrite ? listeners : {})}
+      {...(canWrite ? attributes : {})}
       onClick={onClick}
       className={`mb-2 cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md active:cursor-grabbing ${
         isDragging ? "opacity-40" : ""
@@ -99,7 +114,13 @@ function Column({
   );
 }
 
-export function LeadBoard({ leads, tripsById, onStatusChange, onOpen }: LeadBoardProps) {
+export function LeadBoard({
+  leads,
+  tripsById,
+  onStatusChange,
+  onOpen,
+  canWrite = true,
+}: LeadBoardProps) {
   const [active, setActive] = useState<Lead | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -115,11 +136,13 @@ export function LeadBoard({ leads, tripsById, onStatusChange, onOpen }: LeadBoar
   }, [leads]);
 
   async function handleDragStart(event: DragStartEvent) {
+    if (!canWrite) return;
     setActive(leads.find((l) => l.id === event.active.id) ?? null);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     setActive(null);
+    if (!canWrite || !onStatusChange) return;
     const { active, over } = event;
     const lead = leads.find((l) => l.id === active.id);
     if (!over || !lead || over.id === active.id) return;
@@ -156,6 +179,7 @@ export function LeadBoard({ leads, tripsById, onStatusChange, onOpen }: LeadBoar
                 key={lead.id}
                 lead={lead}
                 tripsById={tripsById}
+                canWrite={canWrite}
                 onClick={() => lead.id && onOpen(lead.id)}
               />
             ))}
@@ -165,7 +189,7 @@ export function LeadBoard({ leads, tripsById, onStatusChange, onOpen }: LeadBoar
       <DragOverlay>
         {active ? (
           <div className="w-64">
-            <LeadCard lead={active} tripsById={tripsById} onClick={() => {}} />
+            <LeadCard lead={active} tripsById={tripsById} canWrite={false} onClick={() => {}} />
           </div>
         ) : null}
       </DragOverlay>

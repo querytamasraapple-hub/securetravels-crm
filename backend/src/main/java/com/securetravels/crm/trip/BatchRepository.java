@@ -37,4 +37,14 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
             order by b.departureDate asc
             """)
     List<Batch> findMinGroupAlertCandidates(@Param("today") LocalDate today, @Param("horizon") LocalDate horizon);
+
+    /** Calendar / dashboard: open departures in a date window (excludes cancelled). */
+    @Query("""
+            select b from Batch b
+            where b.departureDate >= :from
+              and b.departureDate <= :to
+              and b.status <> com.securetravels.crm.trip.Batch.Status.CANCELLED
+            order by b.departureDate asc
+            """)
+    List<Batch> findUpcomingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

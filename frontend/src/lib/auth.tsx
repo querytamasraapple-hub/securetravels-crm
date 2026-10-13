@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import type { components } from "@/openapi/generated";
 import { api, tokenStore } from "@/lib/api";
+import { homePathForRole, loginPathForRole } from "@/lib/rbac";
 
 type User = components["schemas"]["UserInfo"];
 
@@ -40,12 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.accessToken || !res.refreshToken) throw new Error("Login response missing tokens");
       tokenStore.set(res.accessToken, res.refreshToken);
       setUser(res.user ?? null);
-      router.replace("/leads");
+      router.replace(homePathForRole(res.user?.role));
     },
     [router],
   );
 
   const logout = useCallback(async () => {
+    const role = user?.role;
     try {
       const refresh = tokenStore.getRefresh();
       if (refresh) await fetch("/api/auth/logout", {
@@ -56,9 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       tokenStore.clear();
       setUser(null);
-      router.replace("/login");
+      router.replace(loginPathForRole(role));
     }
-  }, [router]);
+  }, [router, user?.role]);
 
   const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
 

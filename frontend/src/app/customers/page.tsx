@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiClientError, type CustomerDetail, type CustomerListItem } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canEditCustomerFlags } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { Sidebar } from "@/components/Sidebar";
-
-const CAN_WRITE = ["MANAGER", "ADMIN", "CEO"];
 const ALLOWED_TAGS = [
   "Kashmir",
   "Char Dham",
@@ -34,7 +33,7 @@ function Tag({ children }: { children: ReactNode }) {
 
 function CustomersView() {
   const { user } = useAuth();
-  const canWrite = !!user?.role && CAN_WRITE.includes(user.role);
+  const canWrite = canEditCustomerFlags(user?.role);
 
   const [rows, setRows] = useState<CustomerListItem[]>([]);
   const [search, setSearch] = useState("");
@@ -133,7 +132,7 @@ function CustomersView() {
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="border-b border-slate-200 bg-white px-6 py-4">
-            <h1 className="text-lg font-semibold text-slate-900">Customers</h1>
+            <h1 className="text-lg font-semibold text-slate-900">Travelers</h1>
             <p className="text-xs text-slate-400">
               Trip counts, spend and remarketing flags. Writes: Manager / Admin / CEO.
             </p>

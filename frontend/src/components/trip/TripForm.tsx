@@ -5,6 +5,7 @@ import { api, type TripDetail, type TripCreatePayload, type TripUpdatePayload, A
 
 const CATEGORIES = ["TREK", "PILGRIMAGE", "LEISURE", "CUSTOM"] as const;
 const BOOKING_TYPES = ["FIXED_BATCH", "CUSTOM_FIT"] as const;
+const DIFFICULTIES = ["EASY", "MODERATE", "DIFFICULT", "VERY_DIFFICULT"] as const;
 
 type TripFormProps = {
   trip?: TripDetail | null;
@@ -17,6 +18,7 @@ export function TripForm({ trip, onSaved, onClose }: TripFormProps) {
     name: trip?.name ?? "",
     category: (trip?.category ?? "LEISURE") as TripCreatePayload["category"],
     bookingType: (trip?.bookingType ?? "FIXED_BATCH") as TripCreatePayload["bookingType"],
+    difficulty: (trip?.difficulty ?? "MODERATE") as (typeof DIFFICULTIES)[number],
     baseCost: trip?.baseCost != null ? String(trip.baseCost) : "",
     durationDays: trip ? String(trip.durationDays) : "",
     itinerary: trip?.itinerary ?? "",
@@ -40,6 +42,7 @@ export function TripForm({ trip, onSaved, onClose }: TripFormProps) {
         name: form.name,
         category: form.category,
         bookingType: form.bookingType,
+        difficulty: form.difficulty,
         baseCost: Number(form.baseCost),
         durationDays: Number(form.durationDays),
         itinerary: form.itinerary || undefined,
@@ -109,6 +112,20 @@ export function TripForm({ trip, onSaved, onClose }: TripFormProps) {
               {BOOKING_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={`${label} col-span-2`}>
+            Difficulty
+            <select
+              value={form.difficulty}
+              onChange={(e) => set("difficulty", e.target.value as (typeof DIFFICULTIES)[number])}
+              className={input}
+            >
+              {DIFFICULTIES.map((d) => (
+                <option key={d} value={d}>
+                  {d}
                 </option>
               ))}
             </select>

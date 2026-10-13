@@ -105,7 +105,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(props.getCors().getAllowedOrigins());
+        // Use patterns (supports http://localhost:*) so Next.js rewrites that
+        // forward the browser Origin do not 403 with "Invalid CORS request".
+        List<String> origins = props.getCors().getAllowedOrigins();
+        if (origins == null || origins.isEmpty()) {
+            cfg.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        } else {
+            boolean hasWildcard = origins.stream().anyMatch(o -> o.contains("*"));
+            if (hasWildcard) {
+                cfg.setAllowedOriginPatterns(origins);
+            } else {
+                cfg.setAllowedOrigins(origins);
+            }
+        }
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Retry-After", "Location"));

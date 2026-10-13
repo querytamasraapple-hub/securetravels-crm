@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, ApiClientError, type Lead, type LeadActivity, type LeadStatusPayload, type Trip } from "@/lib/api";
 import { LOST_REASON_LABEL, pickLostReason } from "@/lib/lostReasons";
+import { useAuth } from "@/lib/auth";
+import { canWriteLeads, SALES_DESK } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { Sidebar } from "@/components/Sidebar";
 import { LeadForm } from "@/components/lead/LeadForm";
@@ -67,6 +69,8 @@ function TimelineEntry({ entry }: { entry: LeadActivity }) {
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { user } = useAuth();
+  const canWrite = canWriteLeads(user?.role);
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [activity, setActivity] = useState<LeadActivity[]>([]);
@@ -131,7 +135,7 @@ export default function LeadDetailPage() {
   const status = lead.status ?? "NEW";
 
   return (
-    <Protected>
+    <Protected allowedRoles={SALES_DESK}>
       <div className="flex min-h-screen">
         <Sidebar />
         <main className="flex-1 p-6">
@@ -161,23 +165,25 @@ export default function LeadDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => setEditing(true)}
-                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Edit
-              </button>
-            </div>
+            {canWrite && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
 
           {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -233,7 +239,7 @@ export default function LeadDetailPage() {
         </main>
       </div>
 
-      {editing && lead && (
+      {editing && canWrite && lead && (
         <LeadForm
           lead={lead}
           trips={[...tripsById.values()]}
@@ -256,7 +262,7 @@ function Field({ label, value }: { label: string; value: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <Protected>
+    <Protected allowedRoles={SALES_DESK}>
       <div className="flex min-h-screen">
         <Sidebar />
         <main className="flex-1 p-6">

@@ -64,7 +64,7 @@ export default function Layout() {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 bg-slate-900 flex-col">
         <div className="px-4 py-5 border-b border-slate-800">
-          <div className="text-white font-bold text-lg">SecureTravels</div>
+          <div className="text-white font-bold text-lg">Trip On Himalaya</div>
           <div className="text-xs text-slate-400">CRM · Phase 1</div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -92,7 +92,7 @@ export default function Layout() {
       {/* Mobile top bar */}
       <header className="md:hidden fixed top-0 inset-x-0 z-30 bg-slate-900 text-white flex items-center justify-between px-4 py-3">
         <button onClick={() => setMenuOpen(!menuOpen)} className="text-xl">☰</button>
-        <div className="font-bold">SecureTravels CRM</div>
+        <div className="font-bold">Trip On Himalaya CRM</div>
         <div className="relative">
           <button onClick={() => { setShowNotif(!showNotif); setMenuOpen(false); }} className="text-lg relative">
             🔔
@@ -122,7 +122,7 @@ export default function Layout() {
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMenuOpen(false)}>
           <div className="absolute inset-y-0 left-0 w-64 bg-slate-900 p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="text-white font-bold mb-4">SecureTravels</div>
+            <div className="text-white font-bold mb-4">Trip On Himalaya</div>
             <nav className="space-y-1">
               {SIDEBAR.map((item) => (
                 <button

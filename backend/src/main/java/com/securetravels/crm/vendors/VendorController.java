@@ -50,7 +50,7 @@ public class VendorController {
 
     @Operation(summary = "Create a vendor", security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('OPS', 'MANAGER', 'ADMIN', 'CEO')")
     public VendorResponse create(@Valid @RequestBody VendorCreateRequest request,
                                  @CurrentUser UserPrincipal caller) {
         return vendors.create(request, caller);
@@ -58,7 +58,7 @@ public class VendorController {
 
     @Operation(summary = "Update a vendor", security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('OPS', 'MANAGER', 'ADMIN', 'CEO')")
     public VendorResponse update(@PathVariable UUID id, @Valid @RequestBody VendorUpdateRequest request,
                                  @CurrentUser UserPrincipal caller) {
         return vendors.update(id, request, caller);

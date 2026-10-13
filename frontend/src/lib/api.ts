@@ -12,6 +12,22 @@ export type TripUpdatePayload = components["schemas"]["TripUpdateRequest"];
 export type Batch = components["schemas"]["BatchResponse"];
 export type BatchCreatePayload = components["schemas"]["BatchCreateRequest"];
 export type BatchUpdatePayload = components["schemas"]["BatchUpdateRequest"];
+
+/** Calendar / dashboard departure row (from GET /api/batches/upcoming). */
+export type UpcomingBatch = {
+  id: string;
+  tripId: string;
+  tripName: string;
+  tripCategory?: string;
+  departureDate: string;
+  maxCapacity: number;
+  seatsBooked: number;
+  available: number;
+  fillPercent: number;
+  capacityColor?: string;
+  guideName?: string | null;
+  status: string;
+};
 /**
  * Guides are the `category = GUIDE` slice of the vendor catalogue. The
  * standalone `/api/guides` endpoints were retired when vendors landed
@@ -49,6 +65,329 @@ export type TargetUpsertPayload = Omit<
   "userId"
 > & { userId?: string | null };
 export type SalesUser = { id: string; fullName: string; email: string };
+
+export type TeamUser = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: "SALES" | "OPS" | "MANAGER" | "ADMIN" | "CEO" | "FINANCE";
+  phone?: string | null;
+  active: boolean;
+  createdAt?: string;
+};
+
+export type FinanceOverview = {
+  collectedRevenue: number;
+  outstandingReceivables: number;
+  overdueAmount: number;
+  refundedAmount: number;
+  bookingPipeline: number;
+  totalExpenses: number;
+  netPosition: number;
+  collectionRatePct: number;
+  completedPaymentCount: number;
+  overduePaymentCount: number;
+  confirmedBookingCount: number;
+  monthlySeries: { month: string; collected: number; expenses: number; outstanding: number }[];
+  revenueByTrip: { name: string; amount: number; count: number }[];
+  expensesByCategory: { name: string; amount: number; count: number }[];
+  paymentsByStatus: { status: string; amount: number; count: number }[];
+};
+
+export type FinancePnL = {
+  from: string;
+  to: string;
+  revenue: number;
+  expenses: number;
+  grossProfit: number;
+  marginPct: number;
+  expenseLines: { name: string; amount: number; count: number }[];
+  revenueByTrip: { name: string; amount: number; count: number }[];
+};
+
+export type FinanceExpense = {
+  id: string;
+  category: string;
+  title: string;
+  amount: number;
+  expenseDate: string;
+  tripId?: string | null;
+  tripName?: string | null;
+  vendorName?: string | null;
+  paymentMethod: string;
+  status: string;
+  notes?: string | null;
+  recordedBy?: string | null;
+  createdAt?: string;
+};
+
+export type FinanceExpenseCreatePayload = {
+  category: string;
+  title: string;
+  amount: number;
+  expenseDate: string;
+  tripId?: string;
+  vendorName?: string;
+  paymentMethod?: string;
+  status?: string;
+  notes?: string;
+};
+
+export type FinanceAging = {
+  current: number;
+  days1to30: number;
+  days31to60: number;
+  days61to90: number;
+  days90plus: number;
+  totalOutstanding: number;
+  lines: {
+    bookingRef: string;
+    amountType: string;
+    amount: number;
+    dueDate?: string | null;
+    daysPastDue: number;
+    bucket: string;
+    status: string;
+  }[];
+};
+
+export type FinanceCashflow = {
+  from: string;
+  to: string;
+  totalInflow: number;
+  totalOutflow: number;
+  netCash: number;
+  daily: { date: string; inflow: number; outflow: number; net: number }[];
+};
+
+export type FinanceTax = {
+  from: string;
+  to: string;
+  taxableRevenue: number;
+  outputGst: number;
+  estimatedInputCredit: number;
+  netGstPayable: number;
+  gstRatePct: number;
+  taxableByTrip: { name: string; amount: number; count: number }[];
+};
+
+export type FinanceTripPnL = {
+  trips: {
+    tripId: string;
+    tripName: string;
+    bookingCount: number;
+    revenue: number;
+    expenses: number;
+    payouts: number;
+    profit: number;
+    marginPct: number;
+  }[];
+};
+
+export type FinanceInvoiceLine = {
+  id?: string;
+  lineNo?: number;
+  description: string;
+  hsnSac: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  taxableAmount?: number;
+  gstRate: number;
+};
+
+export type FinanceInvoice = {
+  id: string;
+  invoiceNo: string;
+  bookingId?: string | null;
+  customerName: string;
+  customerEmail?: string | null;
+  customerWhatsapp?: string | null;
+  customerPhone?: string | null;
+  customerGstin?: string | null;
+  customerAddress?: string | null;
+  customerState?: string | null;
+  customerStateCode?: string | null;
+  placeOfSupply?: string | null;
+  placeOfSupplyCode?: string | null;
+  sellerLegalName?: string | null;
+  sellerTradeName?: string | null;
+  sellerGstin?: string | null;
+  sellerAddress?: string | null;
+  sellerState?: string | null;
+  sellerStateCode?: string | null;
+  sellerPhone?: string | null;
+  sellerEmail?: string | null;
+  sellerBankName?: string | null;
+  sellerBankAccount?: string | null;
+  sellerBankIfsc?: string | null;
+  issueDate: string;
+  dueDate: string;
+  invoiceType?: string;
+  supplyType?: string;
+  reverseCharge?: boolean;
+  sacCode?: string;
+  subtotal: number;
+  cgstRate?: number;
+  sgstRate?: number;
+  igstRate?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  taxAmount: number;
+  totalAmount: number;
+  amountInWords?: string | null;
+  currency: string;
+  status: string;
+  notes?: string | null;
+  declaration?: string | null;
+  whatsappDeliveryStatus?: string;
+  whatsappQueuedAt?: string | null;
+  whatsappSentAt?: string | null;
+  whatsappLastError?: string | null;
+  lines?: FinanceInvoiceLine[];
+  createdAt?: string;
+};
+
+export type FinanceInvoiceCreatePayload = {
+  bookingId?: string;
+  customerName: string;
+  customerEmail?: string;
+  customerWhatsapp: string;
+  customerPhone?: string;
+  customerGstin?: string;
+  customerAddress?: string;
+  customerState?: string;
+  customerStateCode?: string;
+  placeOfSupply?: string;
+  placeOfSupplyCode?: string;
+  issueDate: string;
+  dueDate: string;
+  invoiceType?: string;
+  supplyType?: string;
+  reverseCharge?: boolean;
+  sacCode?: string;
+  status?: string;
+  notes?: string;
+  declaration?: string;
+  queueWhatsapp?: boolean;
+  lines: {
+    description: string;
+    hsnSac?: string;
+    quantity: number;
+    unit?: string;
+    rate: number;
+    gstRate?: number;
+  }[];
+};
+
+export type FinancePayout = {
+  id: string;
+  vendorName: string;
+  category: string;
+  tripId?: string | null;
+  tripName?: string | null;
+  amount: number;
+  payoutDate: string;
+  dueDate?: string | null;
+  paymentMethod: string;
+  status: string;
+  referenceNo?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+};
+
+export type FinancePayoutCreatePayload = {
+  vendorName: string;
+  category: string;
+  tripId?: string;
+  amount: number;
+  payoutDate: string;
+  dueDate?: string;
+  paymentMethod?: string;
+  status?: string;
+  referenceNo?: string;
+  notes?: string;
+};
+
+export type FinanceBudget = {
+  periodMonth: string;
+  lines: {
+    category: string;
+    budgetAmount: number;
+    actualAmount: number;
+    variance: number;
+    usedPct: number;
+  }[];
+  totalBudget: number;
+  totalActual: number;
+  variance: number;
+};
+
+export type TeamUserCreatePayload = {
+  email: string;
+  fullName: string;
+  role: TeamUser["role"];
+  phone?: string;
+  password: string;
+};
+
+export type TeamUserUpdatePayload = {
+  fullName?: string;
+  role?: TeamUser["role"];
+  phone?: string | null;
+  active?: boolean;
+  password?: string;
+};
+
+export type InboxThread = {
+  id: string;
+  subjectType: "LEAD" | "CUSTOMER" | "BOOKING";
+  subjectId: string;
+  channel: "WHATSAPP" | "EMAIL" | "SMS";
+  customerMobile?: string | null;
+  customerName?: string | null;
+  status: "OPEN" | "PENDING" | "CLOSED";
+  unreadCount: number;
+  assignedTo?: string | null;
+  lastMessageAt?: string | null;
+  lastDirection?: string | null;
+  lastPreview?: string | null;
+  serviceWindowExpiresAt?: string | null;
+  templateSendAllowed?: boolean;
+};
+
+export type InboxPage = {
+  content: InboxThread[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
+
+export type InboxListParams = {
+  assignedTo?: string;
+  status?: string;
+  channel?: string;
+  unreadOnly?: boolean;
+  page?: number;
+  size?: number;
+};
+
+export type TimelineEntry = {
+  seq?: number;
+  subjectType?: string;
+  subjectId?: string;
+  direction?: "INBOUND" | "OUTBOUND" | "SYSTEM";
+  channel?: string;
+  kind?: string;
+  templateCode?: string | null;
+  summary?: string | null;
+  body?: string | null;
+  provider?: string | null;
+  customerMobile?: string | null;
+  createdAt?: string;
+};
 
 // ---- Module 2 reports ----------------------------------------------------
 export type SeasonValue = "SPRING" | "MONSOON" | "AUTUMN" | "WINTER";
@@ -116,6 +455,18 @@ export type ApiErrorBody = {
   message?: string;
   fieldErrors?: { field: string; message: string }[];
 };
+
+/** Prefer field-level Bean Validation messages over the generic "Check your input". */
+export function formatApiError(err: unknown, fallback = "Request failed"): string {
+  if (err instanceof ApiClientError) {
+    const fields = err.body.fieldErrors?.filter((f) => f.message).map((f) => f.message);
+    if (fields && fields.length) return fields.join(" · ");
+    if (err.body.message) return err.body.message;
+    return err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 const TOKENS = {
   access: "st_access",
@@ -211,6 +562,11 @@ export const api = {
 
   updateTrip: (id: string, payload: TripUpdatePayload) =>
     request<TripDetail>(`/api/trips/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  listBatches: (tripId: string) => request<Batch[]>(`/api/trips/${tripId}/batches`),
+
+  getUpcomingBatches: (params: { from?: string; to?: string; limit?: number } = {}) =>
+    request<UpcomingBatch[]>(`/api/batches/upcoming${qs({ ...params })}`),
 
   createBatch: (tripId: string, payload: BatchCreatePayload) =>
     request<Batch>(`/api/trips/${tripId}/batches`, { method: "POST", body: JSON.stringify(payload) }),
@@ -319,6 +675,15 @@ export const api = {
 
   getSalesUsers: () => request<SalesUser[]>("/api/users/sales"),
 
+  getTeamUsers: (params: { role?: string; active?: boolean } = {}) =>
+    request<TeamUser[]>(`/api/users${qs({ ...params })}`),
+
+  createTeamUser: (payload: TeamUserCreatePayload) =>
+    request<TeamUser>("/api/users", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateTeamUser: (id: string, payload: TeamUserUpdatePayload) =>
+    request<TeamUser>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
   getSalesFunnel: (params: ReportFilterParams = {}) =>
     request<SalesFunnelData>(`/api/analytics/funnel${qs(params)}`),
 
@@ -336,4 +701,167 @@ export const api = {
 
   getAuditLog: (params: AuditSearchParams = {}) =>
     request<AuditSearchData>(`/api/analytics/audit${qs(params)}`),
+
+  getInboxThreads: (params: InboxListParams = {}) =>
+    request<InboxPage>(`/api/v1/threads${qs({ ...params })}`),
+
+  getInboxThread: (id: string) => request<InboxThread>(`/api/v1/threads/${id}`),
+
+  markInboxThreadRead: (id: string) =>
+    request<InboxThread>(`/api/v1/threads/${id}/read`, { method: "POST" }),
+
+  updateInboxThread: (id: string, payload: { assignedTo?: string | null; status?: string }) =>
+    request<InboxThread>(`/api/v1/threads/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  getTimeline: (subjectType: string, subjectId: string) =>
+    request<TimelineEntry[]>(`/api/timeline/${subjectType}/${subjectId}`),
+
+  getFinanceOverview: (params: { from?: string; to?: string } = {}) =>
+    request<FinanceOverview>(`/api/finance/overview${qs(params)}`),
+
+  getFinancePnL: (params: { from?: string; to?: string } = {}) =>
+    request<FinancePnL>(`/api/finance/pnl${qs(params)}`),
+
+  getFinanceExpenses: (params: { from?: string; to?: string } = {}) =>
+    request<FinanceExpense[]>(`/api/finance/expenses${qs(params)}`),
+
+  createFinanceExpense: (payload: FinanceExpenseCreatePayload) =>
+    request<FinanceExpense>("/api/finance/expenses", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  voidFinanceExpense: (id: string) =>
+    request<FinanceExpense>(`/api/finance/expenses/${id}/void`, { method: "POST" }),
+
+  getFinanceAging: () => request<FinanceAging>("/api/finance/aging"),
+
+  getFinanceCashflow: (params: { from?: string; to?: string } = {}) =>
+    request<FinanceCashflow>(`/api/finance/cashflow${qs(params)}`),
+
+  getFinanceTax: (params: { from?: string; to?: string } = {}) =>
+    request<FinanceTax>(`/api/finance/tax${qs(params)}`),
+
+  getFinanceTripPnL: () => request<FinanceTripPnL>("/api/finance/trip-pnl"),
+
+  getFinanceInvoices: () => request<FinanceInvoice[]>("/api/finance/invoices"),
+
+  getFinanceInvoice: (id: string) => request<FinanceInvoice>(`/api/finance/invoices/${id}`),
+
+  createFinanceInvoice: (payload: FinanceInvoiceCreatePayload) =>
+    request<FinanceInvoice>("/api/finance/invoices", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateFinanceInvoiceStatus: (id: string, status: string) =>
+    request<FinanceInvoice>(`/api/finance/invoices/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
+
+  queueFinanceInvoiceWhatsapp: (id: string) =>
+    request<FinanceInvoice>(`/api/finance/invoices/${id}/queue-whatsapp`, { method: "POST" }),
+
+  getFinancePayouts: () => request<FinancePayout[]>("/api/finance/payouts"),
+
+  createFinancePayout: (payload: FinancePayoutCreatePayload) =>
+    request<FinancePayout>("/api/finance/payouts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateFinancePayoutStatus: (id: string, status: string) =>
+    request<FinancePayout>(`/api/finance/payouts/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
+
+  getFinanceBudgets: (month?: string) =>
+    request<FinanceBudget>(`/api/finance/budgets${qs({ month })}`),
+
+  upsertFinanceBudget: (payload: {
+    periodMonth: string;
+    category: string;
+    budgetAmount: number;
+    notes?: string;
+  }) =>
+    request<FinanceBudget>("/api/finance/budgets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getVendors: (params: { category?: string; active?: boolean } = {}) =>
+    request<Guide[]>(`/api/vendors${qs({ ...params, active: params.active ?? true })}`),
+
+  createVendor: (payload: Record<string, unknown>) =>
+    request<Guide>("/api/vendors", { method: "POST", body: JSON.stringify(payload) }),
+
+  getBasecampAttendance: (params: { from?: string; to?: string } = {}) =>
+    request<Record<string, unknown>[]>(`/api/basecamp/attendance${qs(params)}`),
+
+  upsertBasecampAttendance: (payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/basecamp/attendance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getBasecampLeave: () => request<Record<string, unknown>[]>("/api/basecamp/leave"),
+
+  createBasecampLeave: (payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/basecamp/leave", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  reviewBasecampLeave: (id: string, status: string, note?: string) =>
+    request<Record<string, unknown>>(`/api/basecamp/leave/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ status, note }),
+    }),
+
+  getBasecampPayroll: (month?: string) =>
+    request<Record<string, unknown>[]>(`/api/basecamp/payroll${qs({ month })}`),
+
+  upsertBasecampPayroll: (payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/basecamp/payroll", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getBasecampInventory: () => request<Record<string, unknown>[]>("/api/basecamp/inventory"),
+
+  createBasecampInventory: (payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/basecamp/inventory", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  adjustBasecampInventory: (id: string, quantity: number) =>
+    request<Record<string, unknown>>(`/api/basecamp/inventory/${id}/quantity`, {
+      method: "POST",
+      body: JSON.stringify({ quantity }),
+    }),
+
+  getBasecampVisitors: () => request<Record<string, unknown>[]>("/api/basecamp/visitors"),
+
+  checkInBasecampVisitor: (payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/basecamp/visitors", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  checkOutBasecampVisitor: (id: string) =>
+    request<Record<string, unknown>>(`/api/basecamp/visitors/${id}/checkout`, { method: "POST" }),
+
+  getBasecampSettings: () => request<Record<string, string>>("/api/basecamp/settings"),
+
+  updateBasecampSetting: (key: string, value: string) =>
+    request<Record<string, string>>("/api/basecamp/settings", {
+      method: "POST",
+      body: JSON.stringify({ key, value }),
+    }),
 };

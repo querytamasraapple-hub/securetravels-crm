@@ -89,9 +89,10 @@ public class DemoDataSeeder implements CommandLineRunner {
                 new User("manager@securetravels.in", password("manager123"), "Manager Manager", Role.MANAGER, "9876000002"),
                 new User("sales.ravi@securetravels.in", password("sales123"), "Ravi Singh", Role.SALES, "9876000003"),
                 new User("sales.meera@securetravels.in", password("sales123"), "Meera Joshi", Role.SALES, "9876000004"),
-                new User("ops.suresh@securetravels.in", password("ops123"), "Suresh Rawat", Role.OPS, "9876000005"));
+                new User("ops.suresh@securetravels.in", password("ops123"), "Suresh Rawat", Role.OPS, "9876000005"),
+                new User("finance@securetravels.in", password("finance123"), "Finance Officer", Role.FINANCE, "9876000006"));
         users.saveAll(demo);
-        log.info("[demo-data] seeded 5 demo users (bcrypt strength 12)");
+        log.info("[demo-data] seeded 6 demo users including FINANCE (bcrypt strength 12)");
     }
 
     private void seedTripsIfEmpty() {

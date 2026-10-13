@@ -8,7 +8,7 @@ export default function LoginPage() {
   const { user, login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("admin@securetravels.in");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("admin123");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <form onSubmit={onSubmit} className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="text-xl font-semibold text-slate-900">SecureTravels CRM</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Trip On Himalaya CRM</h1>
         <p className="mt-1 text-sm text-slate-500">Sign in to the sales desk</p>
 
         <label className="mt-6 block text-sm font-medium text-slate-700">
@@ -66,7 +66,13 @@ export default function LoginPage() {
         </button>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          Demo: admin@securetravels.in · manager@securetravels.in · sales…@securetravels.in
+          Demo: admin@securetravels.in / admin123 · manager… / manager123 · sales… / sales123
+        </p>
+        <p className="mt-3 text-center text-xs text-slate-500">
+          Finance team?{" "}
+          <a href="/finance/login" className="font-medium text-emerald-700 hover:underline">
+            Finance ERP login
+          </a>
         </p>
       </form>
     </div>

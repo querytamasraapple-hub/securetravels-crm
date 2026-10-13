@@ -2,26 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type Task } from "@/lib/api";
-
-const TYPE_LABEL: Record<string, string> = {
-  INITIAL_CALL: "First call (within 5 min)",
-  FOLLOW_UP_1D: "Follow-up · Day +1",
-  FOLLOW_UP_3D: "Follow-up · Day +3",
-  FOLLOW_UP_8D: "Follow-up · Day +8",
-  FOLLOW_UP_15D: "Follow-up · Day +15",
-  QUOTATION: "Quotation follow-up",
-  PAYMENT_REMINDER: "Payment reminder",
-  OPS: "Ops handoff",
-  REVIEW: "Review",
-  CUSTOM: "Custom",
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-700",
-  OVERDUE: "bg-red-100 text-red-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  CANCELLED: "bg-slate-100 text-slate-500",
-};
+import { TASK_STATUS_STYLE, TASK_TYPE_LABEL } from "@/lib/taskLabels";
 
 export function FollowUpPanel({ leadId }: { leadId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -81,11 +62,11 @@ export function FollowUpPanel({ leadId }: { leadId: string }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-800">
-                    {TYPE_LABEL[t.type ?? ""] ?? t.type}
+                    {TASK_TYPE_LABEL[t.type ?? ""] ?? t.type}
                   </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      STATUS_STYLE[t.status ?? ""] || ""
+                      TASK_STATUS_STYLE[t.status ?? ""] || ""
                     }`}
                   >
                     {t.status}

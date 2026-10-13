@@ -73,7 +73,7 @@ export async function notifyAllChannels({ userId, leadId, taskId, subject, messa
     leadId,
     taskId,
     channel: 'email',
-    subject: subject || 'SecureTravels reminder',
+    subject: subject || 'Trip On Himalaya reminder',
     message,
   });
 }

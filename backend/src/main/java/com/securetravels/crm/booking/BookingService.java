@@ -68,7 +68,7 @@ import java.util.UUID;
 @Service
 public class BookingService {
 
-    private static final Set<Role> SEES_ALL = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO, Role.OPS);
+    private static final Set<Role> SEES_ALL = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO, Role.OPS, Role.FINANCE);
 
     private static final int HOLD_HOURS = 2;
 

@@ -62,8 +62,8 @@ public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
-    private static final Set<Role> WRITERS = EnumSet.of(Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO);
-    private static final Set<Role> SEES_ALL = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO, Role.OPS);
+    private static final Set<Role> WRITERS = EnumSet.of(Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO, Role.FINANCE);
+    private static final Set<Role> SEES_ALL = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO, Role.OPS, Role.FINANCE);
     private static final String APP_URL = "http://localhost:3000";
 
     private final PaymentRepository payments;

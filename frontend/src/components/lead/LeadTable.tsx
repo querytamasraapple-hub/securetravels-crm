@@ -19,11 +19,19 @@ const STATUS_STYLE: Record<string, string> = {
 type LeadTableProps = {
   leads: Lead[];
   tripsById: Map<string, Trip>;
-  onStatusChange: (id: string, status: LeadStatusPayload) => void;
+  onStatusChange?: (id: string, status: LeadStatusPayload) => void;
   onOpen: (id: string) => void;
+  /** When false, status is shown as a badge (no edits). */
+  canWrite?: boolean;
 };
 
-export function LeadTable({ leads, tripsById, onStatusChange, onOpen }: LeadTableProps) {
+export function LeadTable({
+  leads,
+  tripsById,
+  onStatusChange,
+  onOpen,
+  canWrite = true,
+}: LeadTableProps) {
   if (leads.length === 0) {
     return <p className="py-10 text-center text-sm text-slate-400">No leads match the current filters.</p>;
   }
@@ -66,19 +74,30 @@ export function LeadTable({ leads, tripsById, onStatusChange, onOpen }: LeadTabl
               </td>
               <td className="px-4 py-3 text-slate-600">{lead.ownerName ?? "Unassigned"}</td>
               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                <select
-                  value={status}
-                  onChange={(e) =>
-                    lead.id && onStatusChange(lead.id, { status: e.target.value as LeadStatusPayload["status"] })
-                  }
-                  className={`rounded-full border-0 px-2 py-1 text-xs font-semibold outline-none ${STATUS_STYLE[status] || ""}`}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                {canWrite && onStatusChange ? (
+                  <select
+                    value={status}
+                    onChange={(e) =>
+                      lead.id &&
+                      onStatusChange(lead.id, {
+                        status: e.target.value as LeadStatusPayload["status"],
+                      })
+                    }
+                    className={`rounded-full border-0 px-2 py-1 text-xs font-semibold outline-none ${STATUS_STYLE[status] || ""}`}
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs font-semibold ${STATUS_STYLE[status] || ""}`}
+                  >
+                    {status}
+                  </span>
+                )}
               </td>
             </tr>
             );

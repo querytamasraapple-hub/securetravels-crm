@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { ADMINS, ALL_STAFF, OPS_DESK, type Role } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { Sidebar } from "@/components/Sidebar";
 import { FilterBar, type AppliedFilter } from "@/components/report/filterBar";
@@ -14,19 +15,19 @@ import { AuditLog } from "@/components/report/auditLog";
 
 type TabId = "funnel" | "trips" | "team" | "operations" | "customers" | "audit";
 
-const TABS: { id: TabId; label: string; roles: string[]; blurb: string }[] = [
-  { id: "funnel", label: "Sales funnel", roles: ["SALES", "OPS", "MANAGER", "ADMIN", "CEO"], blurb: "Lead → booked, by stage and source." },
-  { id: "trips", label: "Trip performance", roles: ["SALES", "OPS", "MANAGER", "ADMIN", "CEO"], blurb: "Bookings, capacity and revenue per trip." },
-  { id: "team", label: "Team performance", roles: ["SALES", "OPS", "MANAGER", "ADMIN", "CEO"], blurb: "Consultant revenue and SLA compliance." },
-  { id: "operations", label: "Operations readiness", roles: ["OPS", "MANAGER", "ADMIN", "CEO"], blurb: "Batch gaps and vendor completion." },
-  { id: "customers", label: "Customer insights", roles: ["SALES", "OPS", "MANAGER", "ADMIN", "CEO"], blurb: "Loyalty and churn risk." },
-  { id: "audit", label: "Audit log", roles: ["ADMIN", "CEO"], blurb: "Full-text search over every mutation." },
+const TABS: { id: TabId; label: string; roles: Role[]; blurb: string }[] = [
+  { id: "funnel", label: "Sales funnel", roles: ALL_STAFF, blurb: "Lead → booked, by stage and source." },
+  { id: "trips", label: "Trip performance", roles: ALL_STAFF, blurb: "Bookings, capacity and revenue per trip." },
+  { id: "team", label: "Team performance", roles: ALL_STAFF, blurb: "Consultant revenue and SLA compliance." },
+  { id: "operations", label: "Operations readiness", roles: OPS_DESK, blurb: "Batch gaps and vendor completion." },
+  { id: "customers", label: "Customer insights", roles: ALL_STAFF, blurb: "Loyalty and churn risk." },
+  { id: "audit", label: "Audit log", roles: ADMINS, blurb: "Full-text search over every mutation." },
 ];
 
 function ReportsView() {
   const { user } = useAuth();
-  const role = user?.role ?? "";
-  const visibleTabs = TABS.filter((t) => t.roles.includes(role));
+  const role = user?.role;
+  const visibleTabs = TABS.filter((t) => !!role && t.roles.includes(role as Role));
 
   const [tab, setTab] = useState<TabId>(visibleTabs[0]?.id ?? "funnel");
   const [filter, setFilter] = useState<AppliedFilter>({});

@@ -16,6 +16,7 @@ import com.securetravels.crm.trip.dto.BatchResponse;
 import com.securetravels.crm.trip.dto.TripCreateRequest;
 import com.securetravels.crm.trip.dto.TripDetailResponse;
 import com.securetravels.crm.trip.dto.TripUpdateRequest;
+import com.securetravels.crm.trip.dto.UpcomingBatchResponse;
 import com.securetravels.crm.user.Role;
 import com.securetravels.crm.user.UserPrincipal;
 import com.securetravels.crm.vendors.Vendor;
@@ -28,8 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -78,11 +81,15 @@ public class TripService {
         return toDetail(saved);
     }
 
+    /**
+     * {@code activeOnly=true} → public catalogue (filters / pickers).
+     * {@code activeOnly=false} → full catalogue including drafts (manager CRM).
+     */
     @Transactional(readOnly = true)
-    public List<Trip> list(boolean active) {
-        return active
+    public List<Trip> list(boolean activeOnly) {
+        return activeOnly
                 ? trips.findAllByActiveTrueOrderByNameAsc()
-                : trips.findAllByActiveFalseOrderByNameAsc();
+                : trips.findAllByOrderByNameAsc();
     }
 
     @Transactional(readOnly = true)
@@ -229,6 +236,42 @@ public class TripService {
         return batches.findByTripIdOrderByDepartureDateAsc(tripId).stream()
                 .map(b -> toBatchResponse(b, trip))
                 .toList();
+    }
+
+    /**
+     * Departures for calendar / home dashboard. Defaults: today → +90 days, max 100 rows.
+     */
+    @Transactional(readOnly = true)
+    public List<UpcomingBatchResponse> listUpcoming(LocalDate from, LocalDate to, int limit) {
+        LocalDate start = from != null ? from : LocalDate.now();
+        LocalDate end = to != null ? to : start.plusDays(90);
+        if (end.isBefore(start)) {
+            throw new BadRequestException("to must be on or after from");
+        }
+        int cap = Math.max(1, Math.min(limit > 0 ? limit : 100, 200));
+        List<Batch> rows = batches.findUpcomingBetween(start, end);
+        Map<UUID, Trip> tripCache = new HashMap<>();
+        Map<UUID, String> guideCache = new HashMap<>();
+        int amber = props.getCapacity().getAlertFillPercent();
+        List<UpcomingBatchResponse> out = new ArrayList<>();
+        for (Batch b : rows) {
+            if (out.size() >= cap) break;
+            Trip trip = tripCache.computeIfAbsent(b.getTripId(),
+                    id -> trips.findById(id).orElse(null));
+            if (trip == null) continue;
+            String guideName = null;
+            if (b.getGuideId() != null) {
+                guideName = guideCache.computeIfAbsent(b.getGuideId(),
+                        id -> vendors.findById(id).map(Vendor::getName).orElse(null));
+            }
+            int fill = b.fillPercent();
+            out.add(new UpcomingBatchResponse(
+                    b.getId(), trip.getId(), trip.getName(), trip.getCategory(),
+                    b.getDepartureDate(), b.getMaxCapacity(), b.getSeatsBooked(),
+                    b.seatsAvailable(), fill, CapacityColor.of(fill, amber),
+                    guideName, b.getStatus()));
+        }
+        return out;
     }
 
     @Transactional

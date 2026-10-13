@@ -41,11 +41,12 @@ public class TripController {
         this.trips = trips;
     }
 
-    @Operation(summary = "List trips (default: active only, for filters/pickers)",
+    @Operation(summary = "List trips (active=true: live catalogue; active=false: all including drafts)",
             security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
     public List<TripResponse> list(@RequestParam(defaultValue = "true") boolean active) {
+        // active=false means "full catalogue" for managers — not "inactive only".
         return trips.list(active).stream()
                 .map(t -> new TripResponse(t.getId(), t.getName(), t.getSlug(), t.getCategory(),
                         t.getBookingType(), t.getDifficulty(), t.getBaseCost(), t.getDurationDays(), t.isActive()))

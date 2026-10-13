@@ -45,7 +45,7 @@ public class ThreadController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('AGENT','MANAGER','ADMIN','CEO')")
+    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO')")
     public ResponseEntity<Page<ThreadResponse>> inbox(
             @RequestParam(required = false) UUID assignedTo,
             @RequestParam(required = false) String status,
@@ -68,7 +68,7 @@ public class ThreadController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('AGENT','MANAGER','ADMIN','CEO')")
+    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO')")
     public ResponseEntity<ThreadResponse> get(@PathVariable UUID id) {
         return ResponseEntity.ok(toResponse(threads.get(id)));
     }
@@ -99,7 +99,7 @@ public class ThreadController {
     }
 
     @PostMapping("/{id}/read")
-    @PreAuthorize("hasAnyRole('AGENT','MANAGER','ADMIN','CEO')")
+    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO')")
     public ResponseEntity<ThreadResponse> markRead(@PathVariable UUID id) {
         return ResponseEntity.ok(toResponse(threads.markRead(id)));
     }

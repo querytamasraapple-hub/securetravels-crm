@@ -10,10 +10,11 @@ import {
   type TargetsList,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canManageTargets } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { Sidebar } from "@/components/Sidebar";
+import { TravelOpsHome } from "@/components/dashboard/TravelOpsHome";
 
-const CAN_WRITE = ["MANAGER", "ADMIN", "CEO"];
 const CARD_FIELDS: { key: string; label: string }[] = [
   { key: "totalLeads", label: "Total leads" },
   { key: "newLeads", label: "New leads" },
@@ -67,9 +68,19 @@ function Card({ label, value, big }: { label: string; value: string; big?: boole
   );
 }
 
+function HeroKpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
+      {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
+    </div>
+  );
+}
+
 function DashboardView() {
   const { user } = useAuth();
-  const canWrite = !!user?.role && CAN_WRITE.includes(user.role);
+  const canWrite = canManageTargets(user?.role);
 
   const [period, setPeriod] = useState<"today" | "month">("month");
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -153,9 +164,9 @@ function DashboardView() {
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">Sales dashboard</h1>
+              <h1 className="text-lg font-semibold text-slate-900">Operations dashboard</h1>
               <p className="text-xs text-slate-400">
-                Pipeline cards, per-executive performance and monthly targets.
+                Bookings, packages, departures — plus sales pipeline and targets.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -186,17 +197,36 @@ function DashboardView() {
             {error && <p className="m-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
             <section className="p-6 pb-2">
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <HeroKpi
+                  label="Total bookings"
+                  value={n(summary?.confirmedBookings ?? summary?.newBookings)}
+                  hint={period === "today" ? "Today" : "This month"}
+                />
+                <HeroKpi
+                  label="New leads"
+                  value={n(summary?.newLeads)}
+                  hint={`${n(summary?.totalLeads)} in pipeline`}
+                />
+                <HeroKpi
+                  label="Earnings"
+                  value={summary ? inr(summary.revenue) : "—"}
+                  hint="Collected payments"
+                />
+              </div>
+            </section>
+
+            <section className="px-6 pb-2">
+              <TravelOpsHome />
+            </section>
+
+            <section className="p-6 pt-2">
               <div className="mb-3 text-sm font-medium text-slate-700">
-                Pipeline & revenue — {summary ? summary.period : period}
+                Sales pipeline — {summary ? summary.period : period}
               </div>
               {summary ? (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-                  <Card
-                    label="Revenue collected"
-                    value={inr(summary.revenue)}
-                    big
-                  />
-                  {CARD_FIELDS.filter((f) => f.key !== "revenue").map((f) => (
+                  {CARD_FIELDS.filter((f) => !["revenue", "newBookings", "confirmedBookings", "newLeads", "totalLeads"].includes(f.key)).map((f) => (
                     <Card key={f.key} label={f.label} value={n(summary[f.key as keyof DashboardSummary] as number)} />
                   ))}
                 </div>

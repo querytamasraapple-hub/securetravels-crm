@@ -30,7 +30,7 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="text-3xl font-bold text-white">🏔️ SecureTravels</div>
+          <div className="text-3xl font-bold text-white">🏔️ Trip On Himalaya</div>
           <div className="text-slate-300 text-sm mt-1">Sales &amp; Operations CRM</div>
         </div>
         <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">

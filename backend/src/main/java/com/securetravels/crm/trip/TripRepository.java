@@ -9,5 +9,6 @@ import java.util.UUID;
 public interface TripRepository extends JpaRepository<Trip, UUID> {
     List<Trip> findAllByActiveTrueOrderByNameAsc();
     List<Trip> findAllByActiveFalseOrderByNameAsc();
+    List<Trip> findAllByOrderByNameAsc();
     Optional<Trip> findBySlug(String slug);
 }

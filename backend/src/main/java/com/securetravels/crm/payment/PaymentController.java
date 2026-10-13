@@ -43,7 +43,7 @@ public class PaymentController {
             security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('SALES', 'MANAGER', 'ADMIN', 'CEO')")
+    @PreAuthorize("hasAnyRole('SALES', 'MANAGER', 'ADMIN', 'CEO', 'FINANCE')")
     public PaymentResponse record(@Valid @RequestBody PaymentCreateRequest request,
                                   @CurrentUser UserPrincipal caller) {
         return payments.record(request, caller);
@@ -73,7 +73,7 @@ public class PaymentController {
             security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping(path = "/{id}/status", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('SALES', 'MANAGER', 'ADMIN', 'CEO')")
+    @PreAuthorize("hasAnyRole('SALES', 'MANAGER', 'ADMIN', 'CEO', 'FINANCE')")
     public PaymentResponse updateStatus(@PathVariable UUID id,
                                         @Valid @RequestBody PaymentStatusRequest request,
                                         @CurrentUser UserPrincipal caller) {

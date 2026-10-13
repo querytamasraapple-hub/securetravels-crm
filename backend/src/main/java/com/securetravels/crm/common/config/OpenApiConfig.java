@@ -16,7 +16,7 @@ public class OpenApiConfig {
         final String schemeName = "bearerAuth";
         return new OpenAPI()
                 .info(new Info()
-                        .title("SecureTravels CRM API")
+                        .title("Trip On Himalaya CRM API")
                         .version("0.1.0")
                         .description("Phase 1 — Core CRM. Leads, bookings (FIXED_BATCH / CUSTOM_FIT), payments, operations."))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))

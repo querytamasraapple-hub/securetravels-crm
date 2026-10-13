@@ -38,7 +38,9 @@ app:
     access-minutes: 15
     refresh-days: 7
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+    # Patterns so local Next.js on any port (3000, 3020, …) works through the
+    # /api rewrite that forwards the browser Origin header. Override in prod.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   login-rate-limit:
     capacity: 5
     refill-per-window: 5

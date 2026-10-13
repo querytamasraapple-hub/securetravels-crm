@@ -5,11 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { api, ApiClientError, type Payment, type PaymentSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canWritePayments } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { Sidebar } from "@/components/Sidebar";
 import { PaymentForm } from "@/components/payment/PaymentForm";
-
-const CAN_WRITE = ["SALES", "MANAGER", "ADMIN", "CEO"];
 
 const STATUS_STYLE: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700",
@@ -30,7 +29,7 @@ function fmtDate(d: string | undefined) {
 
 function PaymentsView() {
   const { user } = useAuth();
-  const canWrite = !!user?.role && CAN_WRITE.includes(user.role);
+  const canWrite = canWritePayments(user?.role);
   const searchParams = useSearchParams();
   const bookingFilter = searchParams.get("bookingId") ?? "";
 
